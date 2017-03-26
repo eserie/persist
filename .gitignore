@@ -1,0 +1,13 @@
+*egg-info/
+TAGS
+*.pyc
+docs/_build/*
+persist.egg-info/*
+htmlcov/*
+*,cover
+*xml
+*html
+.coverage
+*~
+*.svg
+*.png
