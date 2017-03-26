@@ -7,3 +7,5 @@ tests:
 coverage:
 	py.test --cov-report=html --cov-report=term --pdb --cov persist -v persist/
 
+publish:
+	git push -u origin master
