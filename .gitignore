@@ -1,13 +1,26 @@
-*egg-info/
-TAGS
+# Compiled python modules.
 *.pyc
+
+# Setuptools distribution folder.
+/dist/
+
+# Python egg metadata, regenerated from source files by setuptools.
+/*.egg-info
+
+# ctags
+TAGS
+
+# sphinx build
 docs/_build/*
-persist.egg-info/*
+build/*
+
+# py.test coverage
 htmlcov/*
 *,cover
-*xml
-*html
 .coverage
+.cache/*
+
+# emacs backups
 *~
-*.svg
-*.png
+
+

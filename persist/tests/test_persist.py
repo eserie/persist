@@ -1,5 +1,5 @@
 import pytest
-from ..persist import Persist
+from ..persist import PersistentDAG
 from functools import wraps
 
 # global variable to simulate the fact to have serialize data somewhere
@@ -53,7 +53,7 @@ class Serializer(object):
 
 
 def setup_graph(**kwargs):
-    g = Persist(**kwargs)
+    g = PersistentDAG(**kwargs)
     serializer = Serializer()
     for pool in ['pool1', 'pool2']:
         g.add_task(('data', pool), serializer, load_data)

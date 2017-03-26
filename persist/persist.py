@@ -4,7 +4,7 @@ from dask.optimize import cull
 import inspect
 
 
-class Persist(object):
+class PersistentDAG(object):
     def __init__(self, use_cluster=False):
         self.dsk = dict()
         self.cache = dict()
