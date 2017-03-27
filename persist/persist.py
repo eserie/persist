@@ -1,4 +1,3 @@
-from functools import partial
 from dask import get
 from dask.optimize import cull
 import inspect
@@ -16,20 +15,30 @@ class PersistentDAG(object):
         else:
             self.cluser = None
             self.client = None
+        self.funcs = dict()
 
     def add_task(self, key, serializer, func, *args, **kwargs):
         self.serializer[key] = serializer
         # prepare arguments for the dask graph specification
         args_dict = inspect.getcallargs(func, *args, **kwargs)
-        args_spec = inspect.getargspec(func)
-        args_list = [args_dict[argname] for argname in args_spec.args]
-        # dump data as side effect
+        args_dict.update({arg_name: self.funcs[arg_value]
+                          for arg_name, arg_value in args_dict.iteritems()
+                          if arg_value in self.funcs.keys()})
+
+        # wrap func in order that it dump data as a side-effect
         func = serializer.dump_result(func, key)
-        # propagate keyword arguments
-        if args_spec.keywords:
-            func = partial(func, **args_dict[args_spec.keywords])
-        # add task to dask graph
-        self.dsk[key] = (func,) + tuple(args_list)
+
+        # use dask delayed collection to wrap functions
+        from dask import delayed
+
+        # data = delayed(func)(dask_key_name=key, *args, **kwargs)
+        delayed_func = delayed(func)(dask_key_name=key, **args_dict)
+
+        # stotre delayed funcs
+        self.funcs[key] = delayed_func
+
+        # update the graph
+        self.dsk.update(delayed_func.dask)
         return key
 
     @property
@@ -51,7 +60,8 @@ class PersistentDAG(object):
                     if key in self.serializer
                     and self.serializer[key].is_computed(key)})
         # use cache instead of loadind
-        dsk.update({key: self.cache[key] for key in dsk.keys() if key in self.cache})
+        dsk.update({key: self.cache[key]
+                    for key in dsk.keys() if key in self.cache})
         # filter again task after function have been replaced by load or values
         if key is not None:
             dsk, _ = cull(dsk, key)
@@ -86,6 +96,10 @@ class PersistentDAG(object):
             return result
 
     def async_run(self, key=None):
-        assert self.client is not None
-        self.client.persist(self.dsk)
-        # return dsk
+        if key is None:
+            key = self.dsk.keys()
+        if not isinstance(key, list):
+            return self.funcs[key].persist()
+        else:
+            futures = [self.funcs[k].persist() for k in key]
+            return futures

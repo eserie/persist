@@ -1,4 +1,4 @@
-import pytest
+# import pytest
 from ..persist import PersistentDAG
 from functools import wraps
 
@@ -57,12 +57,35 @@ def setup_graph(**kwargs):
     serializer = Serializer()
     for pool in ['pool1', 'pool2']:
         g.add_task(('data', pool), serializer, load_data)
-        g.add_task(('cleaned_data', pool), serializer, clean_data, ('data', pool))
-        g.add_task(('analyzed_data', pool), serializer, analyze_data, ('cleaned_data', pool))
+        g.add_task(('cleaned_data', pool), serializer,
+                   clean_data, ('data', pool))
+        g.add_task(('analyzed_data', pool), serializer,
+                   analyze_data, ('cleaned_data', pool))
     return g
 
 
+def test_delayed():
+    from dask import delayed
+    data = delayed(load_data)(dask_key_name=('data', 'pool1'))
+    cleaned_data= delayed(clean_data)(
+        dask_key_name=('cleaned_data', 'pool1'),
+        data=data)
+    assert cleaned_data.compute() == 'cleaned_data'
+
+
 def test_get(capsys):
+    global IS_COMPUTED
+    IS_COMPUTED = dict()
+    g = setup_graph()
+    data = g.get(('data', 'pool1'))
+    assert data == 'data'
+    data = g.get(('cleaned_data', 'pool1'))
+    assert data == 'cleaned_data'
+    data = g.get(('analyzed_data', 'pool1'))
+    assert data == 'analyzed_data'
+
+
+def test_get_multiple_times(capsys):
     global IS_COMPUTED
     IS_COMPUTED = dict()
     g = setup_graph()
@@ -141,7 +164,8 @@ def test_persistent_dsk(capsys):
     assert all(g.is_computed().values())
     # the graph contains the load methods
     assert g.persistent_dsk != g.dsk
-    assert all(map(lambda f: f[0].func_name == 'load', g.persistent_dsk.values()))
+    assert all(map(lambda f: f[0].func_name ==
+                   'load', g.persistent_dsk.values()))
 
     # get multiple results
     data = g.get([('analyzed_data', 'pool1'), ('analyzed_data', 'pool2')])
@@ -183,8 +207,24 @@ def test_async_run(capsys):
     global IS_COMPUTED
     IS_COMPUTED = dict()
     g = setup_graph(use_cluster=True)
-    # persist assert en error because the given collection is not of type dask.base.Base
-    with pytest.raises(AssertionError) as err:
-        g.async_run()
-    err = str(err)
-    assert err
+    # persist assert en error because the given collection is not of type
+    # dask.base.Base
+    data = g.async_run(key=('cleaned_data', 'pool1'))
+    assert data.compute() == 'cleaned_data'
+
+
+def test_async_run_all(capsys):
+    global IS_COMPUTED
+    IS_COMPUTED = dict()
+    g = setup_graph(use_cluster=True)
+    # persist assert en error because the given collection is not of type
+    # dask.base.Base
+    futures = g.async_run()
+    data = map(lambda x: x.compute(), futures)
+
+    assert sorted(data) == ['analyzed_data', 'analyzed_data',
+                            'cleaned_data', 'cleaned_data', 'data', 'data']
+
+    data = g.client.gather(futures)
+    # here I do not know why gather still return delayed objects...
+    # assert isinstance(data[0], str)
