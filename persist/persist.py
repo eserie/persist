@@ -4,6 +4,7 @@ import inspect
 
 
 class PersistentDAG(object):
+
     def __init__(self, use_cluster=False):
         self.dsk = dict()
         self.cache = dict()
@@ -32,7 +33,7 @@ class PersistentDAG(object):
         from dask import delayed
 
         # data = delayed(func)(dask_key_name=key, *args, **kwargs)
-        delayed_func = delayed(func)(dask_key_name=key, **args_dict)
+        delayed_func = delayed(func, pure=True)(dask_key_name=key, **args_dict)
 
         # stotre delayed funcs
         self.funcs[key] = delayed_func
@@ -57,8 +58,7 @@ class PersistentDAG(object):
         # the fact to call the method "is_computed" may slow down the code.
         dsk.update({key: (self.serializer[key].delayed_load(key),)
                     for key in dsk.keys()
-                    if key in self.serializer
-                    and self.serializer[key].is_computed(key)})
+                    if key in self.serializer and self.serializer[key].is_computed(key)})
         # use cache instead of loadind
         dsk.update({key: self.cache[key]
                     for key in dsk.keys() if key in self.cache})

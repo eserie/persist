@@ -24,6 +24,7 @@ def analyze_data(cleaned_data, option=1, **other_options):
 
 
 class Serializer(object):
+
     def __init__(self):
         pass
 
@@ -67,7 +68,7 @@ def setup_graph(**kwargs):
 def test_delayed():
     from dask import delayed
     data = delayed(load_data)(dask_key_name=('data', 'pool1'))
-    cleaned_data= delayed(clean_data)(
+    cleaned_data = delayed(clean_data)(
         dask_key_name=('cleaned_data', 'pool1'),
         data=data)
     assert cleaned_data.compute() == 'cleaned_data'
@@ -200,7 +201,7 @@ def test_cluster(capsys):
     assert data == ['analyzed_data', 'analyzed_data']
     out, err = capsys.readouterr()
     assert not out
-    assert err
+    assert not err
 
 
 def test_async_run(capsys):
