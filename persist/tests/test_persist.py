@@ -67,13 +67,14 @@ def setup_graph(**kwargs):
                    analyze_data, ('cleaned_data', pool))
     return g
 
+
 def test_kwargs():
     g = PersistentDAG()
     serializer = Serializer()
     g.add_task('data', serializer, load_data, option=10)
     data = g.run()
     assert data == {'data': "data_{'option': 10}"}
-        
+
 
 def test_delayed():
     from dask import delayed
