@@ -79,6 +79,28 @@ def setup_graph(**kwargs):
     return g
 
 
+def test_key_none():
+    global IS_COMPUTED
+    IS_COMPUTED = dict()
+    g = PersistentDAG()
+    serializer = Serializer()
+    g.add_task(None, serializer, load_data, option=10)
+    data = g.run()
+    assert data.values() == ["data_{'option': 10}"]
+    assert data.keys()[0].startswith('load_data-')
+
+
+def test_key_none_serializer_none():
+    global IS_COMPUTED
+    IS_COMPUTED = dict()
+    g = PersistentDAG()
+    serializer = Serializer()
+    g.add_task(None, None, load_data, option=10)
+    data = g.run()
+    assert data.values() == ["data_{'option': 10}"]
+    assert data.keys()[0].startswith('load_data-')
+
+
 def test_kwargs():
     global IS_COMPUTED
     IS_COMPUTED = dict()

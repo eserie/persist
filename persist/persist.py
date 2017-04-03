@@ -17,7 +17,8 @@ class PersistentDAG(object):
         self.funcs = dict()
 
     def add_task(self, key, serializer, func, *args, **kwargs):
-        self.serializer[key] = serializer
+        if serializer is not None:
+            self.serializer[key] = serializer
         # prepare arguments for the dask graph specification
         assert key not in self.dsk, "key is already used"
         args_dict = inspect.getcallargs(func, *args, **kwargs)
@@ -34,7 +35,8 @@ class PersistentDAG(object):
         if args_spec.varargs:
             args_tuple += args_dict.pop(args_spec.varargs)
         # wrap func in order that it dump data as a side-effect
-        func = serializer.dump_result(func, key)
+        if serializer is not None:
+            func = serializer.dump_result(func, key)
         # use dask delayed collection to wrap functions
         from dask import delayed
         delayed_func = delayed(func)(
