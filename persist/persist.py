@@ -45,6 +45,12 @@ class PersistentDAG(object):
 
     @property
     def dsk(self):
+        from dask.base import collections_to_dsk
+        dask = collections_to_dsk(self.funcs.values())
+        return dask
+
+    @property
+    def old_dsk(self):
         from dask.delayed import to_task_dask
         task, dask = to_task_dask(self.funcs)
         dask = dict(dask)
