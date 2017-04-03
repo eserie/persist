@@ -1,4 +1,4 @@
-# import pytest
+import pytest
 from functools import wraps
 # from time import sleep
 from ..persist import PersistentDAG
@@ -6,18 +6,24 @@ from ..persist import PersistentDAG
 IS_COMPUTED = dict()
 
 
-def load_data(**kwargs):
+def load_data(*args, **kwargs):
     # sleep(2)
     print 'load data ...'
+    if args:
+        print args
+        return 'data_{}'.format(args)
     if kwargs:
         print kwargs
         return 'data_{}'.format(kwargs)
     return 'data'
 
 
-def clean_data(data):
+def clean_data(data, *args):
     assert isinstance(data, str)
     print 'clean data ...'
+    if args:
+        print args
+        data = data + '_' + '_'.join(map(lambda x: '{}'.format(x), args))
     return 'cleaned_{}'.format(data)
 
 
@@ -69,11 +75,52 @@ def setup_graph(**kwargs):
 
 
 def test_kwargs():
+    global IS_COMPUTED
+    IS_COMPUTED = dict()
     g = PersistentDAG()
     serializer = Serializer()
     g.add_task('data', serializer, load_data, option=10)
     data = g.run()
     assert data == {'data': "data_{'option': 10}"}
+
+
+def test_varargs():
+    global IS_COMPUTED
+    IS_COMPUTED = dict()
+    g = PersistentDAG()
+    serializer = Serializer()
+    varargs = (10,)
+    g.add_task('data', serializer, load_data, *varargs)
+    data = g.run()
+    assert data == {'data': "data_(10,)"}
+
+
+def test_use_already_used_key():
+    global IS_COMPUTED
+    IS_COMPUTED = dict()
+    g = PersistentDAG()
+    serializer = Serializer()
+    g.add_task('key_data1', serializer, load_data, option=10)
+    with pytest.raises(AssertionError) as err:
+        g.add_task('key_data1', serializer, load_data, option=20)
+    err = str(err)
+    assert err.endswith("key is already used")
+
+
+def test_varargs_deps():
+    global IS_COMPUTED
+    IS_COMPUTED = dict()
+    g = PersistentDAG()
+    serializer = Serializer()
+    g.add_task('key_data1', serializer, load_data, option=10)
+    g.add_task('key_data2', serializer, load_data, option=20)
+    varargs = ('key_data1', 'key_data2',)
+    g.add_task('cleaned_data', serializer, clean_data, *varargs)
+    data = g.run()
+    assert data == {'key_data1': "data_{'option': 10}",
+                    'key_data2': "data_{'option': 20}",
+                    'cleaned_data': "cleaned_data_{'option': 10}_data_{'option': 20}",
+                    }
 
 
 def test_delayed():
