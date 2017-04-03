@@ -18,12 +18,17 @@ def load_data(*args, **kwargs):
     return 'data'
 
 
-def clean_data(data, *args):
+def clean_data(data, *args, **kwargs):
     assert isinstance(data, str)
     print 'clean data ...'
     if args:
         print args
         data = data + '_' + '_'.join(map(lambda x: '{}'.format(x), args))
+    if kwargs:
+        print kwargs
+        data = data + '_' + \
+            '_'.join(map(lambda kv: '{}_{}'.format(
+                kv[0], kv[1]), kwargs.items()))
     return 'cleaned_{}'.format(data)
 
 
@@ -120,6 +125,22 @@ def test_varargs_deps():
     assert data == {'key_data1': "data_{'option': 10}",
                     'key_data2': "data_{'option': 20}",
                     'cleaned_data': "cleaned_data_{'option': 10}_data_{'option': 20}",
+                    }
+
+
+def test_kwargs_deps():
+    global IS_COMPUTED
+    IS_COMPUTED = dict()
+    g = PersistentDAG()
+    serializer = Serializer()
+    g.add_task('key_data1', serializer, load_data, option=10)
+    g.add_task('key_data2', serializer, load_data, option=20)
+    kwargs = dict(data='key_data1', other='key_data2')
+    g.add_task('cleaned_data', serializer, clean_data, **kwargs)
+    data = g.run()
+    assert data == {'key_data1': "data_{'option': 10}",
+                    'key_data2': "data_{'option': 20}",
+                    'cleaned_data': "cleaned_data_{'option': 10}_other_data_{'option': 20}",
                     }
 
 
