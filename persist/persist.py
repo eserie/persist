@@ -16,6 +16,17 @@ class PersistentDAG(object):
             self.client = None
         self.funcs = dict()
 
+    def submit(self, func, *args, **kwargs):
+        """
+        submit func to the graph.
+        Special keyword arguments are:
+        - dask_key_name
+        - dask_serializer
+        """
+        key = kwargs.pop('dask_key_name')
+        serializer = kwargs.pop('dask_serializer')
+        return self.add_task(key, serializer, func, *args, **kwargs)
+
     def add_task(self, key, serializer, func, *args, **kwargs):
         if serializer is not None:
             self.serializer[key] = serializer
