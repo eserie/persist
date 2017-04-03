@@ -1,26 +1,30 @@
 # import pytest
-from ..persist import PersistentDAG
 from functools import wraps
-
+# from time import sleep
+from ..persist import PersistentDAG
 # global variable to simulate the fact to have serialize data somewhere
 IS_COMPUTED = dict()
 
 
-def load_data():
+def load_data(**kwargs):
+    # sleep(2)
     print 'load data ...'
+    if kwargs:
+        print kwargs
+        return 'data_{}'.format(kwargs)
     return 'data'
 
 
 def clean_data(data):
     assert isinstance(data, str)
     print 'clean data ...'
-    return 'cleaned_data'
+    return 'cleaned_{}'.format(data)
 
 
 def analyze_data(cleaned_data, option=1, **other_options):
     assert isinstance(cleaned_data, str)
     print 'analyze data ...'
-    return 'analyzed_data'
+    return 'analyzed_{}'.format(cleaned_data)
 
 
 class Serializer(object):
@@ -63,11 +67,18 @@ def setup_graph(**kwargs):
                    analyze_data, ('cleaned_data', pool))
     return g
 
+def test_kwargs():
+    g = PersistentDAG()
+    serializer = Serializer()
+    g.add_task('data', serializer, load_data, option=10)
+    data = g.run()
+    assert data == {'data': "data_{'option': 10}"}
+        
 
 def test_delayed():
     from dask import delayed
     data = delayed(load_data)(dask_key_name=('data', 'pool1'))
-    cleaned_data= delayed(clean_data)(
+    cleaned_data = delayed(clean_data)(
         dask_key_name=('cleaned_data', 'pool1'),
         data=data)
     assert cleaned_data.compute() == 'cleaned_data'
@@ -82,7 +93,7 @@ def test_get(capsys):
     data = g.get(('cleaned_data', 'pool1'))
     assert data == 'cleaned_data'
     data = g.get(('analyzed_data', 'pool1'))
-    assert data == 'analyzed_data'
+    assert data == 'analyzed_cleaned_data'
 
 
 def test_get_multiple_times(capsys):
@@ -90,11 +101,11 @@ def test_get_multiple_times(capsys):
     IS_COMPUTED = dict()
     g = setup_graph()
     data = g.get(('analyzed_data', 'pool1'))
-    assert data == 'analyzed_data'
+    assert data == 'analyzed_cleaned_data'
 
     # Checking that it is cached
     data = g.get(('analyzed_data', 'pool1'))
-    assert data == 'analyzed_data'
+    assert data == 'analyzed_cleaned_data'
 
     data = g.get(('cleaned_data', 'pool1'))
     assert data == 'cleaned_data'
@@ -103,7 +114,7 @@ def test_get_multiple_times(capsys):
     assert data == 'cleaned_data'
 
     data = g.get(('analyzed_data', 'pool2'))
-    assert data == 'analyzed_data'
+    assert data == 'analyzed_cleaned_data'
 
     # get multiple results
     data = g.get([('analyzed_data', 'pool1'), ('analyzed_data', 'pool2')])
@@ -138,8 +149,8 @@ def test_run(capsys):
 
     data = g.run([('analyzed_data', 'pool1'), ('analyzed_data', 'pool2')])
     assert isinstance(data, dict)
-    assert data == {('analyzed_data', 'pool2'): 'analyzed_data',
-                    ('analyzed_data', 'pool1'): 'analyzed_data'}
+    assert data == {('analyzed_data', 'pool2'): 'analyzed_cleaned_data',
+                    ('analyzed_data', 'pool1'): 'analyzed_cleaned_data'}
 
 
 def test_persistent_dsk(capsys):
@@ -155,9 +166,10 @@ def test_persistent_dsk(capsys):
     assert all(g.is_computed().values())
     assert g.persistent_dsk != g.dsk
     # then the graph is replaced by cached data
-    assert g.persistent_dsk.values() == \
-        ['cleaned_data', 'analyzed_data', 'data', 'cleaned_data',
-         'data', 'analyzed_data']
+    values = dict(g.persistent_dsk).values()
+
+    assert values == ['cleaned_data', 'analyzed_cleaned_data',
+                      'data', 'cleaned_data', 'data', 'analyzed_cleaned_data']
 
     # We recreate a new graph => the cache is deleted
     g = setup_graph()
@@ -170,7 +182,7 @@ def test_persistent_dsk(capsys):
     # get multiple results
     data = g.get([('analyzed_data', 'pool1'), ('analyzed_data', 'pool2')])
     assert isinstance(data, list)
-    assert data == ['analyzed_data', 'analyzed_data']
+    assert data == ['analyzed_cleaned_data', 'analyzed_cleaned_data']
 
     out, err = capsys.readouterr()
     assert out == """load data ...
@@ -197,7 +209,7 @@ def test_cluster(capsys):
     g = setup_graph(use_cluster=True)
     data = g.get([('analyzed_data', 'pool1'), ('analyzed_data', 'pool2')])
     assert isinstance(data, list)
-    assert data == ['analyzed_data', 'analyzed_data']
+    assert data == ['analyzed_cleaned_data', 'analyzed_cleaned_data']
     out, err = capsys.readouterr()
     assert not out
     assert err
@@ -222,7 +234,7 @@ def test_async_run_all(capsys):
     futures = g.async_run()
     data = map(lambda x: x.compute(), futures)
 
-    assert sorted(data) == ['analyzed_data', 'analyzed_data',
+    assert sorted(data) == ['analyzed_cleaned_data', 'analyzed_cleaned_data',
                             'cleaned_data', 'cleaned_data', 'data', 'data']
 
     data = g.client.gather(futures)
