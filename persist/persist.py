@@ -1,3 +1,4 @@
+from functools import wraps
 from dask import get
 from dask.optimize import cull
 import inspect
@@ -15,6 +16,12 @@ class PersistentDAG(object):
             self.cluser = None
             self.client = None
         self.funcs = dict()
+
+    def delayed(self, func, key=None, serializer=None):
+        @wraps(func)
+        def wrapped_func(*args, **kwargs):
+            self.add_task(key, serializer, func, *args, **kwargs)
+        return wrapped_func
 
     def submit(self, func, *args, **kwargs):
         """

@@ -79,7 +79,7 @@ def setup_graph(**kwargs):
     return g
 
 
-def test_submit():
+def test_submit_api():
     g = PersistentDAG()
     serializer = Serializer()
     for pool in ['pool1', 'pool2']:
@@ -92,6 +92,22 @@ def test_submit():
         g.submit(analyze_data, ('cleaned_data', pool),
                  dask_key_name=('analyzed_data', pool),
                  dask_serializer=serializer)
+    data = g.run()
+    assert data == {('analyzed_data', 'pool1'): 'analyzed_cleaned_data',
+                    ('analyzed_data', 'pool2'): 'analyzed_cleaned_data',
+                    ('cleaned_data', 'pool1'): 'cleaned_data',
+                    ('cleaned_data', 'pool2'): 'cleaned_data',
+                    ('data', 'pool1'): 'data',
+                    ('data', 'pool2'): 'data'}
+
+
+def test_delayed_api():
+    g = PersistentDAG()
+    serializer = Serializer()
+    for pool in ['pool1', 'pool2']:
+        g.delayed(load_data, ('data', pool), serializer)()
+        g.delayed(clean_data, ('cleaned_data', pool), serializer)(('data', pool))
+        g.delayed(analyze_data, ('analyzed_data', pool), serializer)(('cleaned_data', pool))
     data = g.run()
     assert data == {('analyzed_data', 'pool1'): 'analyzed_cleaned_data',
                     ('analyzed_data', 'pool2'): 'analyzed_cleaned_data',
