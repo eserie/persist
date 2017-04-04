@@ -2,9 +2,13 @@ from functools import wraps
 from dask import get
 from dask.optimize import cull
 import inspect
+
+from dask import threaded
 from dask.base import Base
 from dask.base import collections_to_dsk
 from dask import delayed
+
+__all__ = ['PersistentDAG']
 
 
 def prepare_args(func, args, kwargs, funcs):
@@ -70,6 +74,10 @@ def persistent_collections_to_dsk(collections,
 
 
 class PersistentDAG(Base):
+    __slots__ = ('dask', '_keys')
+    _finalize = staticmethod(list)
+    _default_get = staticmethod(threaded.get)
+    _optimize = staticmethod(lambda d, k, **kwds: d)
 
     def __init__(self, use_cluster=False):
         self.cache = dict()
@@ -82,6 +90,10 @@ class PersistentDAG(Base):
             self.cluser = None
             self.client = None
         self.funcs = dict()
+        self.dask = dict()
+
+    def _keys(self):
+        return self.funcs.keys()
 
     def delayed(self, func, key=None, serializer=None):
         @wraps(func)
@@ -124,10 +136,13 @@ class PersistentDAG(Base):
         self.funcs[key] = delayed_func
         if serializer is not None:
             self.serializer[key] = serializer
-        return key
+
+        # update state
+        self.dask = self._dask
+        return delayed_func
 
     @property
-    def dask(self):
+    def _dask(self):
         dask = collections_to_dsk(self.funcs.values())
         return dask
 

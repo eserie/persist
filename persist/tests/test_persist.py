@@ -382,3 +382,20 @@ def test_visualize():
     IS_COMPUTED = dict()
     g = setup_graph(use_cluster=True)
     g.visualize(format='svg')
+
+
+def test_compute_method():
+    global IS_COMPUTED
+    IS_COMPUTED = dict()
+    g = setup_graph(use_cluster=True)
+    data = g.compute()
+    assert data == ['cleaned_data', 'analyzed_cleaned_data', 'data', 'cleaned_data', 'data',
+                    'analyzed_cleaned_data']
+
+
+def test_persist_method():
+    global IS_COMPUTED
+    IS_COMPUTED = dict()
+    g = setup_graph(use_cluster=True)
+    data = g.persist()
+    assert type(data) == PersistentDAG
