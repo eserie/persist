@@ -103,15 +103,17 @@ class PersistentDAG(Base):
 
     def submit(self, func, *args, **kwargs):
         """
-        submit func to the graph.
+        add_task to the graph and persist
+        """
+        func = self.add_task(func, *args, **kwargs)
+        return func.persist()
+
+    def add_task(self, func, *args, **kwargs):
+        """
         Special keyword arguments are:
         - dask_key_name
         - dask_serializer
         """
-        func = self.add_task(func, *args, **kwargs)
-        return self.get(key=func._key)
-
-    def add_task(self, func, *args, **kwargs):
         key = kwargs.pop('dask_key_name', None)
         serializer = kwargs.pop('dask_serializer', None)
 
@@ -129,8 +131,10 @@ class PersistentDAG(Base):
         # set key
         if key is None:
             # use tokenize key named setted by delayed
+            # in this case dask manage correctly unicity of keys
             key = delayed_func._key
-        assert key not in self.dask, "key is already used"
+        else:
+            assert key not in self.dask, "key is already used"
 
         # store func and serializer
         self.funcs[key] = delayed_func

@@ -166,7 +166,8 @@ def test_varargs():
     g = PersistentDAG()
     serializer = Serializer()
     varargs = (10,)
-    g.add_task(load_data, *varargs, dask_key_name='data', dask_serializer=serializer)
+    g.add_task(load_data, *varargs, dask_key_name='data',
+               dask_serializer=serializer)
     data = g.run()
     assert data == {'data': "data_(10,)"}
 
@@ -228,7 +229,11 @@ def test_kwargs_deps():
     # finally add one task without key_name and without serializer
     func = g.add_task(analyze_data, 'cleaned_data')
     data = g.run()
-    assert data[func._key] == "analyzed_cleaned_data_{'option': 10}_other_data_{'option': 20}"
+    ref_data = "analyzed_cleaned_data_{'option': 10}_other_data_{'option': 20}"
+    assert data[func._key] == ref_data
+
+    data = g.submit(analyze_data, 'cleaned_data')
+    assert data.compute() == ref_data
 
 
 def test_delayed():
