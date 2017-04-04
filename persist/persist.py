@@ -2,6 +2,70 @@ from functools import wraps
 from dask import get
 from dask.optimize import cull
 import inspect
+from dask.base import collections_to_dsk
+from dask import delayed
+
+
+def prepare_args(func, args, kwargs, funcs):
+    """
+    prepare arguments of the given func.
+    If some arguments correspond to keys in the dict of delayed funcs,
+    they are replaced by it.
+    """
+    args_dict = inspect.getcallargs(func, *args, **kwargs)
+    args_spec = inspect.getargspec(func)
+    if args_spec.keywords:
+        kwds = args_dict.pop(args_spec.keywords)
+        args_dict.update(kwds)
+    args_dict.update({arg_name: funcs[arg_value]
+                      for arg_name, arg_value in args_dict.iteritems()
+                      if arg_value in funcs.keys()})
+    # set list of arguments
+    args_tuple = tuple([args_dict.pop(argname) for argname in args_spec.args])
+    if args_spec.varargs:
+        args_tuple += args_dict.pop(args_spec.varargs)
+    return args_tuple, args_dict
+
+
+def get_relevant_keys_from_on_disk_cache(dsk, serializers):
+    # the fact to call the method "is_computed" may slow down the code.
+    dsk_serialized = {key: (serializers[key].delayed_load(key),)
+                      for key in dsk.keys()
+                      if key in serializers and
+                      serializers[key].is_computed(key)}
+    return dsk_serialized
+
+
+def get_relevant_keys_from_memory_cache(dsk, cache):
+    dsk_cached = {key: cache[key]
+                  for key in dsk.keys() if key in cache}
+    return dsk_cached
+
+
+def persistent_collections_to_dsk(collections,
+                                  key=None, serializers=None, cache=None,
+                                  *args, **kwargs):
+
+    dsk = collections_to_dsk(collections, *args, **kwargs)
+
+    if key is not None:
+        dsk, _ = cull(dsk, key)
+
+    if serializers is not None:
+        # load instead of compute
+        dsk_serialized = get_relevant_keys_from_on_disk_cache(dsk, serializers)
+        dsk.update(dsk_serialized)
+
+    if cache is not None:
+        # use cache instead of loadind
+        dsk_cached = get_relevant_keys_from_memory_cache(dsk, cache)
+        dsk.update(dsk_cached)
+
+    # filter again task after function have been replaced by load or values
+    if key is not None:
+        dsk, _ = cull(dsk, key)
+
+    return dsk
 
 
 class PersistentDAG(object):
@@ -36,33 +100,26 @@ class PersistentDAG(object):
         return self.add_task(key, serializer, func, *args, **kwargs)
 
     def add_task(self, key, serializer, func, *args, **kwargs):
-        # prepare arguments for the dask graph specification
-        args_dict = inspect.getcallargs(func, *args, **kwargs)
-        args_spec = inspect.getargspec(func)
-        if args_spec.keywords:
-            kwds = args_dict.pop(args_spec.keywords)
-            args_dict.update(kwds)
-        args_dict.update({arg_name: self.funcs[arg_value]
-                          for arg_name, arg_value in args_dict.iteritems()
-                          if arg_value in self.funcs.keys()})
-        # set list of arguments
-        args_tuple = tuple([args_dict.pop(argname)
-                            for argname in args_spec.args])
-        if args_spec.varargs:
-            args_tuple += args_dict.pop(args_spec.varargs)
+        # prepare arguments
+        args_tuple, args_dict = prepare_args(func, args, kwargs, self.funcs)
+
         # wrap func in order that it dump data as a side-effect
         if serializer is not None:
             func = serializer.dump_result(func, key)
+
         # use dask delayed collection to wrap functions
-        from dask import delayed
         delayed_func = delayed(func, pure=True)(
             dask_key_name=key, *args_tuple, **args_dict)
-        # stotre delayed funcs
+
+        # set key
         if key is None:
+            # use tokenize key named setted by delayed
             keys = delayed_func.dask.keys()
             assert len(keys) == 1
             key = keys[0]
         assert key not in self.dsk, "key is already used"
+
+        # store func and serializer
         self.funcs[key] = delayed_func
         if serializer is not None:
             self.serializer[key] = serializer
@@ -70,16 +127,13 @@ class PersistentDAG(object):
 
     @property
     def dsk(self):
-        from dask.base import collections_to_dsk
         dask = collections_to_dsk(self.funcs.values())
         return dask
 
-    # @property
-    # def old_dsk(self):
-    #     from dask.delayed import to_task_dask
-    #     task, dask = to_task_dask(self.funcs)
-    #     dask = dict(dask)
-    #     return dask
+    def get_persistent_dsk(self, key=None, *args, **kwargs):
+        collections = self.funcs.values()
+        return persistent_collections_to_dsk(
+            collections, key, self.serializer, self.cache, *args, **kwargs)
 
     @property
     def persistent_dsk(self):
@@ -88,26 +142,6 @@ class PersistentDAG(object):
     def is_computed(self):
         return {key: self.serializer[key].is_computed(key)
                 for key in self.dsk.keys() if key in self.serializer}
-
-    def get_persistent_dsk(self, key=None):
-        dsk = self.dsk
-        if key is not None:
-            dsk, _ = cull(dsk, key)
-        # load instead of compute
-        # the fact to call the method "is_computed" may slow down the code.
-        dsk_serialized = {key: (self.serializer[key].delayed_load(key),)
-                          for key in dsk.keys()
-                          if key in self.serializer and
-                          self.serializer[key].is_computed(key)}
-        dsk.update(dsk_serialized)
-        # use cache instead of loadind
-        dsk_cached = {key: self.cache[key]
-                      for key in dsk.keys() if key in self.cache}
-        dsk.update(dsk_cached)
-        # filter again task after function have been replaced by load or values
-        if key is not None:
-            dsk, _ = cull(dsk, key)
-        return dsk
 
     def get(self, key):
         """
