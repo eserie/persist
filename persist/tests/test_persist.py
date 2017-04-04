@@ -288,20 +288,20 @@ def test_run(capsys):
                     ('analyzed_data', 'pool1'): 'analyzed_cleaned_data'}
 
 
-def test_persistent_dsk(capsys):
+def test_persistent_dask(capsys):
     global IS_COMPUTED
     IS_COMPUTED = dict()
     g = setup_graph()
     # the first time the grap is created it has functions
     assert not all(g.is_computed().values())
-    assert g.persistent_dsk == g.dsk
+    assert g.persistent_dask == g.dask
 
     # run the graph
     g.run()
     assert all(g.is_computed().values())
-    assert g.persistent_dsk != g.dsk
+    assert g.persistent_dask != g.dask
     # then the graph is replaced by cached data
-    values = dict(g.persistent_dsk).values()
+    values = dict(g.persistent_dask).values()
 
     assert values == ['cleaned_data', 'analyzed_cleaned_data',
                       'data', 'cleaned_data', 'data', 'analyzed_cleaned_data']
@@ -310,9 +310,9 @@ def test_persistent_dsk(capsys):
     g = setup_graph()
     assert all(g.is_computed().values())
     # the graph contains the load methods
-    assert g.persistent_dsk != g.dsk
+    assert g.persistent_dask != g.dask
     assert all(map(lambda f: f[0].func_name ==
-                   'load', g.persistent_dsk.values()))
+                   'load', g.persistent_dask.values()))
 
     # get multiple results
     data = g.get([('analyzed_data', 'pool1'), ('analyzed_data', 'pool2')])
@@ -375,3 +375,10 @@ def test_async_run_all(capsys):
     data = g.client.gather(futures)
     # here I do not know why gather still return delayed objects...
     # assert isinstance(data[0], str)
+
+
+def test_visualize():
+    global IS_COMPUTED
+    IS_COMPUTED = dict()
+    g = setup_graph(use_cluster=True)
+    g.visualize(format='svg')

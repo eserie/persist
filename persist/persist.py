@@ -2,6 +2,7 @@ from functools import wraps
 from dask import get
 from dask.optimize import cull
 import inspect
+from dask.base import Base
 from dask.base import collections_to_dsk
 from dask import delayed
 
@@ -68,7 +69,7 @@ def persistent_collections_to_dsk(collections,
     return dsk
 
 
-class PersistentDAG(object):
+class PersistentDAG(Base):
 
     def __init__(self, use_cluster=False):
         self.cache = dict()
@@ -117,7 +118,7 @@ class PersistentDAG(object):
             keys = delayed_func.dask.keys()
             assert len(keys) == 1
             key = keys[0]
-        assert key not in self.dsk, "key is already used"
+        assert key not in self.dask, "key is already used"
 
         # store func and serializer
         self.funcs[key] = delayed_func
@@ -126,29 +127,29 @@ class PersistentDAG(object):
         return key
 
     @property
-    def dsk(self):
+    def dask(self):
         dask = collections_to_dsk(self.funcs.values())
         return dask
 
-    def get_persistent_dsk(self, key=None, *args, **kwargs):
+    def get_persistent_dask(self, key=None, *args, **kwargs):
         collections = self.funcs.values()
         return persistent_collections_to_dsk(
             collections, key, self.serializer, self.cache, *args, **kwargs)
 
     @property
-    def persistent_dsk(self):
-        return self.get_persistent_dsk()
+    def persistent_dask(self):
+        return self.get_persistent_dask()
 
     def is_computed(self):
         return {key: self.serializer[key].is_computed(key)
-                for key in self.dsk.keys() if key in self.serializer}
+                for key in self.dask.keys() if key in self.serializer}
 
     def get(self, key):
         """
         Wrapper around dask.get.
         Use cache or serialzed data if available.
         """
-        dsk = self.get_persistent_dsk(key)
+        dsk = self.get_persistent_dask(key)
         # get result
         if self.client:
             result = self.client.get(dsk, key)
@@ -164,7 +165,7 @@ class PersistentDAG(object):
 
     def run(self, key=None):
         if key is None:
-            key = self.dsk.keys()
+            key = self.dask.keys()
         result = self.get(key)
         if isinstance(key, list):
             return dict(zip(key, result))
@@ -173,7 +174,7 @@ class PersistentDAG(object):
 
     def async_run(self, key=None):
         if key is None:
-            key = self.dsk.keys()
+            key = self.dask.keys()
         if not isinstance(key, list):
             return self.funcs[key].persist()
         else:
