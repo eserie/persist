@@ -106,8 +106,10 @@ def test_delayed_api():
     serializer = Serializer()
     for pool in ['pool1', 'pool2']:
         g.delayed(load_data, ('data', pool), serializer)()
-        g.delayed(clean_data, ('cleaned_data', pool), serializer)(('data', pool))
-        g.delayed(analyze_data, ('analyzed_data', pool), serializer)(('cleaned_data', pool))
+        g.delayed(clean_data, ('cleaned_data', pool),
+                  serializer)(('data', pool))
+        g.delayed(analyze_data, ('analyzed_data', pool),
+                  serializer)(('cleaned_data', pool))
     data = g.run()
     assert data == {('analyzed_data', 'pool1'): 'analyzed_cleaned_data',
                     ('analyzed_data', 'pool2'): 'analyzed_cleaned_data',
@@ -126,6 +128,10 @@ def test_key_none():
     data = g.run()
     assert data.values() == ["data_{'option': 10}"]
     assert data.keys()[0].startswith('load_data-')
+    keys = g.funcs.keys()
+    assert len(keys) == 1
+    assert keys[0] is not None
+    assert keys[0].startswith('load_data-')
 
 
 def test_key_none_serializer_none():

@@ -35,8 +35,6 @@ class PersistentDAG(object):
         return self.add_task(key, serializer, func, *args, **kwargs)
 
     def add_task(self, key, serializer, func, *args, **kwargs):
-        if serializer is not None:
-            self.serializer[key] = serializer
         # prepare arguments for the dask graph specification
         assert key not in self.dsk, "key is already used"
         args_dict = inspect.getcallargs(func, *args, **kwargs)
@@ -60,7 +58,13 @@ class PersistentDAG(object):
         delayed_func = delayed(func)(
             dask_key_name=key, *args_tuple, **args_dict)
         # stotre delayed funcs
+        if key is None:
+            keys = delayed_func.dask.keys()
+            assert len(keys) == 1
+            key = keys[0]
         self.funcs[key] = delayed_func
+        if serializer is not None:
+            self.serializer[key] = serializer
         return key
 
     @property
