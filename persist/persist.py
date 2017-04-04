@@ -61,7 +61,7 @@ class PersistentDAG(object):
             keys = delayed_func.dask.keys()
             assert len(keys) == 1
             key = keys[0]
-        assert key not in self.dsk, "key is already used"            
+        assert key not in self.dsk, "key is already used"
         self.funcs[key] = delayed_func
         if serializer is not None:
             self.serializer[key] = serializer
