@@ -24,7 +24,8 @@ def prepare_args(func, args, kwargs, funcs):
         args_dict.update(kwds)
     args_dict.update({arg_name: funcs[arg_value]
                       for arg_name, arg_value in args_dict.iteritems()
-                      if arg_value in funcs.keys()})
+                      if not isinstance(arg_value, Base) and
+                      arg_value in funcs.keys()})
     # set list of arguments
     args_tuple = tuple([args_dict.pop(argname) for argname in args_spec.args])
     if args_spec.varargs:
@@ -98,7 +99,7 @@ class PersistentDAG(Base):
     def delayed(self, func):
         @wraps(func)
         def wrapped_func(*args, **kwargs):
-            self.add_task(func, *args, **kwargs)
+            return self.add_task(func, *args, **kwargs)
         return wrapped_func
 
     def submit(self, func, *args, **kwargs):

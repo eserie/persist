@@ -236,10 +236,26 @@ def test_kwargs_deps():
     assert data.compute() == ref_data
 
 
-def test_delayed():
+def test_dask_delayed():
     from dask import delayed
     data = delayed(load_data)(dask_key_name=('data', 'pool1'))
+    assert data.compute() == 'data'
     cleaned_data = delayed(clean_data)(
+        dask_key_name=('cleaned_data', 'pool1'),
+        data=data)
+    assert cleaned_data.compute() == 'cleaned_data'
+
+
+def test_persistent_delayed():
+    """
+    Check with have the same behaviour than with dask delayed.
+    """
+    global IS_COMPUTED
+    IS_COMPUTED = dict()
+    g = PersistentDAG()
+    data = g.delayed(load_data)(dask_key_name=('data', 'pool1'))
+    assert data.compute() == 'data'
+    cleaned_data = g.delayed(clean_data)(
         dask_key_name=('cleaned_data', 'pool1'),
         data=data)
     assert cleaned_data.compute() == 'cleaned_data'
