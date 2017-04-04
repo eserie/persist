@@ -209,6 +209,11 @@ def test_kwargs_deps():
                     'cleaned_data': "cleaned_data_{'option': 10}_other_data_{'option': 20}",
                     }
 
+    # finally add one task without key_name and without serializer
+    func = g.add_task(None, None, analyze_data, 'cleaned_data')
+    data = g.run()
+    assert data[func._key] == "analyzed_cleaned_data_{'option': 10}_other_data_{'option': 20}"
+
 
 def test_delayed():
     from dask import delayed

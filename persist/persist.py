@@ -127,9 +127,7 @@ class PersistentDAG(Base):
         # set key
         if key is None:
             # use tokenize key named setted by delayed
-            keys = delayed_func.dask.keys()
-            assert len(keys) == 1
-            key = keys[0]
+            key = delayed_func._key
         assert key not in self.dask, "key is already used"
 
         # store func and serializer
