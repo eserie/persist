@@ -95,10 +95,10 @@ class PersistentDAG(Base):
     def _keys(self):
         return self.funcs.keys()
 
-    def delayed(self, func, key=None, serializer=None):
+    def delayed(self, func):
         @wraps(func)
         def wrapped_func(*args, **kwargs):
-            self.add_task(key, serializer, func, *args, **kwargs)
+            self.add_task(func, *args, **kwargs)
         return wrapped_func
 
     def submit(self, func, *args, **kwargs):
@@ -108,12 +108,14 @@ class PersistentDAG(Base):
         - dask_key_name
         - dask_serializer
         """
-        key = kwargs.pop('dask_key_name')
-        serializer = kwargs.pop('dask_serializer')
-        return self.add_task(key, serializer, func, *args, **kwargs)
+        func = self.add_task(func, *args, **kwargs)
+        return self.get(key=func._key)
 
-    def add_task(self, key, serializer, func, *args, **kwargs):
-        # prepare arguments
+    def add_task(self, func, *args, **kwargs):
+        key = kwargs.pop('dask_key_name', None)
+        serializer = kwargs.pop('dask_serializer', None)
+
+        # Prepare arguments
         args_tuple, args_dict = prepare_args(func, args, kwargs, self.funcs)
 
         # wrap func in order that it dump data as a side-effect
