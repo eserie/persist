@@ -1,5 +1,6 @@
 # from time import sleep
 
+
 def load_data(*args, **kwargs):
     # sleep(2)
     print 'load data ...'

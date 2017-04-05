@@ -1,8 +1,7 @@
-import pytest
+# import pytest
 # from time import sleep
 from ..dag import DAG
 # global variable to simulate the fact to have serialize data somewhere
-IS_COMPUTED = dict()
 
 from .helpers import load_data, clean_data, analyze_data
 
@@ -20,8 +19,6 @@ def setup_graph(**kwargs):
 
 
 def test_get(capsys):
-    global IS_COMPUTED
-    IS_COMPUTED = dict()
     g = setup_graph()
     data = g.get(('data', 'pool1'))
     assert data == 'data'
