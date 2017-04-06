@@ -1,9 +1,12 @@
 import pytest
 from functools import wraps
+import dask
+from distributed import Client
 from ..persist import PersistentDAG
 
 from .helpers import load_data, clean_data, analyze_data
 
+dask.set_options(get=dask.async.get_sync)
 # global variable to simulate the fact to have serialize data somewhere
 IS_COMPUTED = dict()
 
@@ -247,25 +250,26 @@ def test_get_multiple_times(capsys):
     global IS_COMPUTED
     IS_COMPUTED = dict()
     g = setup_graph()
-    data = g.get(('analyzed_data', 'pool1'))
-    assert data == 'analyzed_cleaned_data'
+    with dask.set_options(get=dask.async.get_sync):
+        data = g.get(('analyzed_data', 'pool1'))
+        assert data == 'analyzed_cleaned_data'
 
-    # Checking that it is cached
-    data = g.get(('analyzed_data', 'pool1'))
-    assert data == 'analyzed_cleaned_data'
+        # Checking that it is cached
+        data = g.get(('analyzed_data', 'pool1'))
+        assert data == 'analyzed_cleaned_data'
 
-    data = g.get(('cleaned_data', 'pool1'))
-    assert data == 'cleaned_data'
+        data = g.get(('cleaned_data', 'pool1'))
+        assert data == 'cleaned_data'
 
-    data = g.get(('cleaned_data', 'pool2'))
-    assert data == 'cleaned_data'
+        data = g.get(('cleaned_data', 'pool2'))
+        assert data == 'cleaned_data'
 
-    data = g.get(('analyzed_data', 'pool2'))
-    assert data == 'analyzed_cleaned_data'
+        data = g.get(('analyzed_data', 'pool2'))
+        assert data == 'analyzed_cleaned_data'
 
-    # get multiple results
-    data = g.get([('analyzed_data', 'pool1'), ('analyzed_data', 'pool2')])
-    assert isinstance(data, list)
+        # get multiple results
+        data = g.get([('analyzed_data', 'pool1'), ('analyzed_data', 'pool2')])
+        assert isinstance(data, list)
 
     # check printed messages
     out, err = capsys.readouterr()
@@ -309,25 +313,26 @@ def test_persistent_dask(capsys):
     assert g.persistent_dask == g.dask
 
     # run the graph
-    g.run()
-    assert all(g.is_computed().values())
-    assert g.persistent_dask != g.dask
-    # then the graph is replaced by cached data
-    values = dict(g.persistent_dask).values()
+    with dask.set_options(get=dask.async.get_sync):
+        g.run()
+        assert IS_COMPUTED
+        assert all(g.is_computed().values())
+        assert g.persistent_dask != g.dask
+        # then the graph is replaced by cached data
+        values = dict(g.persistent_dask).values()
 
-    assert values == ['cleaned_data', 'analyzed_cleaned_data',
-                      'data', 'cleaned_data', 'data', 'analyzed_cleaned_data']
+        assert values == ['cleaned_data', 'analyzed_cleaned_data',
+                          'data', 'cleaned_data', 'data', 'analyzed_cleaned_data']
 
-    # We recreate a new graph => the cache is deleted
-    g = setup_graph()
-    assert all(g.is_computed().values())
-    # the graph contains the load methods
-    assert g.persistent_dask != g.dask
-    assert all(map(lambda f: f[0].func_name ==
-                   'load', g.persistent_dask.values()))
-
-    # get multiple results
-    data = g.get([('analyzed_data', 'pool1'), ('analyzed_data', 'pool2')])
+        # We recreate a new graph => the cache is deleted
+        g = setup_graph()
+        assert all(g.is_computed().values())
+        # the graph contains the load methods
+        assert g.persistent_dask != g.dask
+        assert all(map(lambda f: f[0].func_name ==
+                       'load', g.persistent_dask.values()))
+        # get multiple results
+        data = g.get([('analyzed_data', 'pool1'), ('analyzed_data', 'pool2')])
     assert isinstance(data, list)
     assert data == ['analyzed_cleaned_data', 'analyzed_cleaned_data']
 
@@ -351,55 +356,58 @@ load data for key ('analyzed_data', 'pool2') ...
 
 
 def test_cluster(capsys):
-    global IS_COMPUTED
-    IS_COMPUTED = dict()
-    g = setup_graph(use_cluster=True)
-    data = g.get([('analyzed_data', 'pool1'), ('analyzed_data', 'pool2')])
-    assert isinstance(data, list)
-    assert data == ['analyzed_cleaned_data', 'analyzed_cleaned_data']
-    out, err = capsys.readouterr()
-    assert not out
-    # assert not err
+    with Client():
+        global IS_COMPUTED
+        IS_COMPUTED = dict()
+        g = setup_graph()
+        data = g.get([('analyzed_data', 'pool1'), ('analyzed_data', 'pool2')])
+        assert isinstance(data, list)
+        assert data == ['analyzed_cleaned_data', 'analyzed_cleaned_data']
+        out, err = capsys.readouterr()
+        assert not out
+        # assert not err
 
 
 def test_async_run(capsys):
     global IS_COMPUTED
     IS_COMPUTED = dict()
-    g = setup_graph(use_cluster=True)
-    # persist assert en error because the given collection is not of type
-    # dask.base.Base
-    data = g.async_run(key=('cleaned_data', 'pool1'))
-    assert data.compute() == 'cleaned_data'
+    with Client():
+        g = setup_graph()
+        # persist assert en error because the given collection is not of type
+        # dask.base.Base
+        data = g.async_run(key=('cleaned_data', 'pool1'))
+        assert data.compute() == 'cleaned_data'
 
 
 def test_async_run_all(capsys):
     global IS_COMPUTED
     IS_COMPUTED = dict()
-    g = setup_graph(use_cluster=True)
-    # persist assert en error because the given collection is not of type
-    # dask.base.Base
-    futures = g.async_run()
-    data = map(lambda x: x.compute(), futures)
+    with Client() as client:
+        g = setup_graph()
+        # persist assert en error because the given collection is not of type
+        # dask.base.Base
+        futures = g.async_run()
+        data = map(lambda x: x.compute(), futures)
 
-    assert sorted(data) == ['analyzed_cleaned_data', 'analyzed_cleaned_data',
-                            'cleaned_data', 'cleaned_data', 'data', 'data']
+        assert sorted(data) == ['analyzed_cleaned_data', 'analyzed_cleaned_data',
+                                'cleaned_data', 'cleaned_data', 'data', 'data']
 
-    data = g.client.gather(futures)
-    # here I do not know why gather still return delayed objects...
-    # assert isinstance(data[0], str)
+        data = client.gather(futures)
+        # here I do not know why gather still return delayed objects...
+        # assert isinstance(data[0], str)
 
 
 def test_visualize():
     global IS_COMPUTED
     IS_COMPUTED = dict()
-    g = setup_graph(use_cluster=True)
+    g = setup_graph()
     g.visualize(format='svg')
 
 
 def test_compute_method():
     global IS_COMPUTED
     IS_COMPUTED = dict()
-    g = setup_graph(use_cluster=True)
+    g = setup_graph()
     data = g.compute()
     assert data == ['cleaned_data', 'analyzed_cleaned_data', 'data', 'cleaned_data', 'data',
                     'analyzed_cleaned_data']
@@ -408,6 +416,7 @@ def test_compute_method():
 def test_persist_method():
     global IS_COMPUTED
     IS_COMPUTED = dict()
-    g = setup_graph(use_cluster=True)
-    data = g.persist()
-    assert type(data) == PersistentDAG
+    with Client():
+        g = setup_graph()
+        data = g.persist()
+        assert type(data) == PersistentDAG

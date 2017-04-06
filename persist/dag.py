@@ -1,6 +1,5 @@
 
 from functools import wraps
-from dask import get
 import inspect
 from dask import threaded
 from dask.base import Base
@@ -92,23 +91,15 @@ class DAG(Base):
             self.serializer[key] = serializer
 
         # update state
-        self.dask = self._dask
+        self.dask = collections_to_dsk(self.funcs.values())
         return delayed_func
 
-    @property
-    def _dask(self):
-        dask = collections_to_dsk(self.funcs.values())
-        return dask
-
-    def get(self, key):
-        """
-        Wrapper around dask.get.
-        Use cache or serialzed data if available.
-        """
-        dsk = self.dask
-        # get result
-        result = get(dsk, key)
-        # store in cache
+    def get(self, key, **kwargs):
+        result = self._get(self.dask, key, **kwargs)
+        if isinstance(key, list):
+            # TODO: should we convert to the same type than key? This should be
+            # done by dask?
+            result = list(result)
         return result
 
     def run(self, key=None):
@@ -121,10 +112,15 @@ class DAG(Base):
             return result
 
     def async_run(self, key=None):
+        dsk = self.dask
         if key is None:
-            key = self.dask.keys()
-        if not isinstance(key, list):
-            return self.funcs[key].persist()
+            key = dsk.keys()
+        from dask.base import persist
+        if isinstance(key, list):
+            funcs = [v for k, v in self.funcs.items() if k in key]
+            (futures, ) = persist(funcs)
+            return futures
         else:
-            futures = [self.funcs[k].persist() for k in key]
+            funcs = self.funcs[key]
+            (futures, ) = persist(funcs)
             return futures

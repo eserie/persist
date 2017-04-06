@@ -1,4 +1,3 @@
-from dask import get
 from dask.optimize import cull
 from dask.base import collections_to_dsk
 
@@ -49,17 +48,10 @@ def persistent_collections_to_dsk(collections,
 
 
 class PersistentDAG(DAG):
-    def __init__(self, use_cluster=False):
+    def __init__(self):
         super(PersistentDAG, self).__init__(self)
         self.cache = dict()
         self.serializer = dict()
-        if use_cluster:
-            from distributed import LocalCluster, Client
-            self.cluster = LocalCluster()
-            self.client = Client(self.cluster)
-        else:
-            self.cluser = None
-            self.client = None
 
     def get_persistent_dask(self, key=None, *args, **kwargs):
         collections = self.funcs.values()
@@ -74,17 +66,16 @@ class PersistentDAG(DAG):
         return {key: self.serializer[key].is_computed(key)
                 for key in self.dask.keys() if key in self.serializer}
 
-    def get(self, key):
+    def get(self, key, **kwargs):
         """
         Wrapper around dask.get.
         Use cache or serialzed data if available.
+        TODO: self.dask should be replaced by the persistent collection
+        so the method get should not have to be reproduced
         """
         dsk = self.get_persistent_dask(key)
         # get result
-        if self.client:
-            result = self.client.get(dsk, key)
-        else:
-            result = get(dsk, key)
+        result = self._get(dsk, key, **kwargs)
         # store in cache
         try:
             self.cache.update({key: result})
