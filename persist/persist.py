@@ -48,15 +48,34 @@ def persistent_collections_to_dsk(collections,
 
 
 class PersistentDAG(DAG):
-    def __init__(self):
-        super(PersistentDAG, self).__init__(self)
-        self.cache = dict()
-        self.serializer = dict()
+    def __init__(self, dsk=None, cache=None, serializer=None):
+        super(PersistentDAG, self).__init__(dsk)
+        if cache is None:
+            cache = dict()
+        if serializer is None:
+            serializer = dict()
+        self.cache = cache
+        self.serializer = serializer
 
     def get_persistent_dask(self, key=None, *args, **kwargs):
-        collections = self.funcs.values()
+        collections = self.collections.values()
         return persistent_collections_to_dsk(
             collections, key, self.serializer, self.cache, *args, **kwargs)
+
+    def add_task(self, func, *args, **kwargs):
+        """
+        Special keyword arguments are:
+        - dask_key_name
+        - dask_serializer
+        """
+        serializer = kwargs.pop('dask_serializer', None)
+        # do not pop because needed by DAG.add_task
+        key = kwargs.get('dask_key_name', None)
+        # wrap func in order that it dump data as a side-effect
+        if serializer is not None:
+            func = serializer.dump_result(func, key)
+            self.serializer[key] = serializer
+        return super(PersistentDAG, self).add_task(func, *args, **kwargs)
 
     @property
     def persistent_dask(self):

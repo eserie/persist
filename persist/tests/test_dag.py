@@ -69,7 +69,7 @@ def test_key_none():
     data = g.run()
     assert data.values() == ["data_{'option': 10}"]
     assert data.keys()[0].startswith('load_data-')
-    keys = g.funcs.keys()
+    keys = g.collections.keys()
     assert len(keys) == 1
     assert keys[0] is not None
     assert keys[0].startswith('load_data-')
@@ -279,18 +279,36 @@ def test_async_run_all(capsys):
 
 
 def test_visualize():
-    g = setup_graph(use_cluster=True)
+    g = setup_graph()
     g.visualize(format='svg')
 
 
 def test_compute_method():
-    g = setup_graph(use_cluster=True)
+    g = setup_graph()
     data = g.compute()
-    assert data == ['cleaned_data', 'analyzed_cleaned_data', 'data', 'cleaned_data', 'data',
-                    'analyzed_cleaned_data']
+    assert data == ['analyzed_cleaned_data', 'analyzed_cleaned_data']
 
 
 def test_persist_method():
-    g = setup_graph(use_cluster=True)
+    g = setup_graph()
     data = g.persist()
     assert type(data) == DAG
+
+
+def test_terminal_node():
+    g = setup_graph()
+    terminal_nodes = g.terminal_nodes
+    assert terminal_nodes == [
+        ('analyzed_data', 'pool2'), ('analyzed_data', 'pool1')]
+
+
+def test_dask_to_digraph():
+    from ..dag import dask_to_digraph, digraph_to_dask
+    g = setup_graph()
+    graph = dask_to_digraph(g.dask)
+    dsk = digraph_to_dask(graph)
+    assert dsk.keys() == g.dask.keys()
+    assert dsk == g.dask
+    g2 = DAG.from_digraph(graph)
+    data = g2.compute()
+    assert data == ['analyzed_cleaned_data', 'analyzed_cleaned_data']

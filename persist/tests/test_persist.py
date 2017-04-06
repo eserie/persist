@@ -106,7 +106,7 @@ def test_key_none():
     data = g.run()
     assert data.values() == ["data_{'option': 10}"]
     assert data.keys()[0].startswith('load_data-')
-    keys = g.funcs.keys()
+    keys = g.collections.keys()
     assert len(keys) == 1
     assert keys[0] is not None
     assert keys[0].startswith('load_data-')
@@ -409,8 +409,7 @@ def test_compute_method():
     IS_COMPUTED = dict()
     g = setup_graph()
     data = g.compute()
-    assert data == ['cleaned_data', 'analyzed_cleaned_data', 'data', 'cleaned_data', 'data',
-                    'analyzed_cleaned_data']
+    assert data == ['analyzed_cleaned_data', 'analyzed_cleaned_data']
 
 
 def test_persist_method():
