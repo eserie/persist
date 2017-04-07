@@ -1,6 +1,4 @@
-
 from functools import wraps
-import inspect
 from dask import threaded
 from dask.base import Base
 from dask.delayed import Delayed
@@ -14,11 +12,10 @@ __all__ = ['DAG']
 def dask_to_collections(dask):
     funcs = dict()
     for key in dask.keys():
-        #dsk, _ = cull(dask, key)
-        #funcs[key] = Delayed(key, dsk)
+        # dsk, _ = cull(dask, key)
+        # funcs[key] = Delayed(key, dsk)
         funcs[key] = Delayed(key, dask)
     return funcs
-
 
 
 def dask_to_digraph(dsk):
@@ -78,13 +75,16 @@ class DAG(Base):
         - dask_key_name
         """
         if kwargs.get('dask_key_name'):
-                assert kwargs.get('dask_key_name') not in self.dask, "specified key is already used"
+            assert kwargs.get(
+                'dask_key_name') not in self.dask, "specified key is already used"
+
         delayed_func = delayed(func, pure=True)
 
-        # normalize args and kwargs replacing values that are in the graph by Delayed objects
+        # normalize args and kwargs replacing values that are in the graph by
+        # Delayed objects
         collections = dask_to_collections(self.dask)
         args = [collections[arg] if arg in collections else arg for arg in args]
-        kwargs.update({k:v for k, v in collections.items() if k in kwargs})
+        kwargs.update({k: v for k, v in collections.items() if k in kwargs})
         delayed_func = delayed_func(*args, **kwargs)
         key = delayed_func._key
         # update state

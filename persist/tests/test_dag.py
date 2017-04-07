@@ -110,6 +110,39 @@ def test_use_already_used_key():
     assert err.endswith("key is already used")
 
 
+def test_add_task_in_good_order():
+    g = DAG()
+    g.add_task(func=load_data,
+               dask_key_name=('data', 'pool1'))
+    g.add_task(clean_data, ('data', 'pool1'),
+               dask_key_name=('cleaned_data', 'pool1'))
+    g.add_task(analyze_data, ('cleaned_data', 'pool1'),
+               dask_key_name=('analyzed_data', 'pool1'))
+    data = g.compute()
+    assert data == ['analyzed_cleaned_data']
+
+
+def test_add_task_in_wrong_order():
+    g = DAG()
+    g.add_task(analyze_data, ('cleaned_data', 'pool1'),
+               dask_key_name=('analyzed_data', 'pool1'))
+    g.add_task(clean_data, ('data', 'pool1'),
+               dask_key_name=('cleaned_data', 'pool1'))
+    g.add_task(func=load_data,
+               dask_key_name=('data', 'pool1'))
+    data = g.compute()
+    assert data == ['analyzed_cleaned_data']
+
+
+def test_only_analyze():
+    g = DAG()
+    g.add_task(analyze_data, 'clean_data',
+               dask_key_name='analyze_data')
+
+    g.add_task(func=load_data, option=10,
+               dask_key_name='key_data1')
+
+
 def test_varargs_deps():
     g = DAG()
 
