@@ -1,3 +1,6 @@
 # persist
 
-Implement persistent collections for dask
+Implement DAG and persistent collections for dask.
+
+<img src=notebooks/persist.svg  width=200px>
+

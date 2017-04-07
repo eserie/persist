@@ -6,8 +6,8 @@ from .dag import DAG
 __all__ = ['PersistentDAG']
 
 DOT_STATUS = {
-    'computed': dict(style='filled', color='green'),
-    'not_computed': dict(style='filled', color='red'),
+    'computed': dict(style='filled', color='lightgreen'),
+    'not_computed': dict(style='filled', color='lightred'),
     'pending': dict(style='filled', color='lightgrey'),
 }
 
@@ -130,5 +130,5 @@ class PersistentDAG(DAG):
         dot_status = self.dot_status()
         return super(PersistentDAG, self).visualize(
             data_attributes=dot_status,
-            function_attributes=dot_status,
+            # function_attributes=dot_status,
             *args, **kwargs)
