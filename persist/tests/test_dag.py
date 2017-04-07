@@ -123,15 +123,17 @@ def test_add_task_in_good_order():
 
 
 def test_add_task_in_wrong_order():
-    g = DAG()
-    g.add_task(analyze_data, ('cleaned_data', 'pool1'),
-               dask_key_name=('analyzed_data', 'pool1'))
-    g.add_task(clean_data, ('data', 'pool1'),
-               dask_key_name=('cleaned_data', 'pool1'))
-    g.add_task(func=load_data,
-               dask_key_name=('data', 'pool1'))
-    data = g.compute()
-    assert data == ['analyzed_cleaned_data']
+    with pytest.raises(AssertionError) as err:
+        g = DAG()
+        g.add_task(analyze_data, ('cleaned_data', 'pool1'),
+                   dask_key_name=('analyzed_data', 'pool1'))
+        g.add_task(clean_data, ('data', 'pool1'),
+                   dask_key_name=('cleaned_data', 'pool1'))
+        g.add_task(func=load_data,
+                   dask_key_name=('data', 'pool1'))
+        g.compute()
+    err = str(err)
+    assert err.endswith("isinstance(('cleaned_data', 'pool1'), str)")
 
 
 def test_only_analyze():
