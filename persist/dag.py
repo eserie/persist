@@ -88,7 +88,7 @@ class DAG(Base):
                 'dask_key_name') not in self.dask, "specified key is already used"
 
         delayed_func = delayed(func, pure=True)
-        collections = dask_to_collections(self.dask)
+        collections = self.collections
         delayed_func = eval_delayed(delayed_func, collections, *args, **kwargs)
         key = delayed_func._key
 
