@@ -23,4 +23,7 @@ htmlcov/*
 # emacs backups
 *~
 
+notebooks/*
 
+
+.DS_Store
