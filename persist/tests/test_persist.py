@@ -1,3 +1,4 @@
+import os
 import pytest
 from functools import wraps
 import dask
@@ -422,7 +423,9 @@ def test_async_run_all(capsys):
         # assert isinstance(data[0], str)
 
 
-def test_visualize_not_computed():
+def test_visualize_not_computed(tmpdir):
+    tmpdir = str(tmpdir)
+    os.chdir(tmpdir)
     global IS_COMPUTED
     IS_COMPUTED = dict()
     g = setup_graph()
@@ -446,7 +449,9 @@ def test_persist_method():
         assert type(data) == PersistentDAG
 
 
-def test_visualize_computed():
+def test_visualize_computed(tmpdir):
+    tmpdir = str(tmpdir)
+    os.chdir(tmpdir)
     global IS_COMPUTED
     IS_COMPUTED = dict()
     g = setup_graph()

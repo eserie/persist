@@ -1,3 +1,4 @@
+import os
 import pytest
 import dask
 from distributed.client import Client
@@ -325,7 +326,9 @@ def test_async_run_all(capsys):
         # assert isinstance(data[0], str)
 
 
-def test_visualize():
+def test_visualize(tmpdir):
+    tmpdir = str(tmpdir)
+    os.chdir(tmpdir)
     g = setup_graph()
     g.visualize(format='svg')
 
