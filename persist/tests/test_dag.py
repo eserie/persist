@@ -32,7 +32,8 @@ def test_submit_api():
         g.submit(analyze_data, ('cleaned_data', pool),
                  dask_key_name=('analyzed_data', pool),
                  )
-    data = g.run()
+    futures = g.run()
+    data = g.results(futures)
     assert data == {('analyzed_data', 'pool1'): 'analyzed_cleaned_data',
                     ('analyzed_data', 'pool2'): 'analyzed_cleaned_data',
                     ('cleaned_data', 'pool1'): 'cleaned_data',
@@ -53,7 +54,9 @@ def test_delayed_api():
         g.delayed(analyze_data)(('cleaned_data', pool),
                                 dask_key_name=('analyzed_data', pool),
                                 )
-    data = g.run()
+    futures = g.run()
+    data = g.results(futures)
+    data = g.results(futures)
     assert data == {('analyzed_data', 'pool1'): 'analyzed_cleaned_data',
                     ('analyzed_data', 'pool2'): 'analyzed_cleaned_data',
                     ('cleaned_data', 'pool1'): 'cleaned_data',
@@ -66,7 +69,8 @@ def test_key_none():
     g = DAG()
 
     g.add_task(func=load_data, option=10)
-    data = g.run()
+    futures = g.run()
+    data = g.results(futures)
     assert data.values() == ["data_{'option': 10}"]
     assert data.keys()[0].startswith('load_data-')
     keys = g.collections.keys()
@@ -78,7 +82,8 @@ def test_key_none():
 def test_key_none_serializer_none():
     g = DAG()
     g.add_task(load_data, option=10)
-    data = g.run()
+    futures = g.run()
+    data = g.results(futures)
     assert data.values() == ["data_{'option': 10}"]
     assert data.keys()[0].startswith('load_data-')
 
@@ -87,7 +92,8 @@ def test_kwargs():
     g = DAG()
     g.add_task(dask_key_name='data',
                func=load_data, option=10)
-    data = g.run()
+    futures = g.run()
+    data = g.results(futures)
     assert data == {'data': "data_{'option': 10}"}
 
 
@@ -96,7 +102,8 @@ def test_varargs():
 
     varargs = (10,)
     g.add_task(load_data, *varargs, dask_key_name='data')
-    data = g.run()
+    futures = g.run()
+    data = g.results(futures)
     assert data == {'data': "data_(10,)"}
 
 
@@ -155,7 +162,8 @@ def test_varargs_deps():
     varargs = ('key_data1', 'key_data2',)
     g.add_task(clean_data, *varargs,
                dask_key_name='cleaned_data')
-    data = g.run()
+    futures = g.run()
+    data = g.results(futures)
     assert data == {'key_data1': "data_{'option': 10}",
                     'key_data2': "data_{'option': 20}",
                     'cleaned_data': "cleaned_data_{'option': 10}_data_{'option': 20}",
@@ -169,7 +177,8 @@ def test_kwargs_deps():
     g.add_task(dask_key_name='key_data2', func=load_data, option=20)
     kwargs = dict(data='key_data1', other='key_data2')
     g.add_task(dask_key_name='cleaned_data', func=clean_data, **kwargs)
-    data = g.run()
+    futures = g.run()
+    data = g.results(futures)
     assert data == {'key_data1': "data_{'option': 10}",
                     'key_data2': "data_{'option': 20}",
                     'cleaned_data': "cleaned_data_{'option': 10}_other_data_{'option': 20}",
@@ -177,7 +186,8 @@ def test_kwargs_deps():
 
     # finally add one task without key_name and without serializer
     func = g.add_task(analyze_data, 'cleaned_data')
-    data = g.run()
+    futures = g.run()
+    data = g.results(futures)
     ref_data = "analyzed_cleaned_data_{'option': 10}_other_data_{'option': 20}"
     assert data[func._key] == ref_data
 
@@ -268,10 +278,12 @@ analyze data ...
 def test_run(capsys):
     g = setup_graph()
     # run the graph
-    data = g.run(key=('cleaned_data', 'pool2'))
+    futures = g.run(key=('cleaned_data', 'pool2'))
+    data = g.results(futures).values()[0]
     assert data == 'cleaned_data'
 
-    data = g.run([('analyzed_data', 'pool1'), ('analyzed_data', 'pool2')])
+    futures = g.run([('analyzed_data', 'pool1'), ('analyzed_data', 'pool2')])
+    data = g.results(futures)
     assert isinstance(data, dict)
     assert data == {('analyzed_data', 'pool2'): 'analyzed_cleaned_data',
                     ('analyzed_data', 'pool1'): 'analyzed_cleaned_data'}
@@ -293,8 +305,9 @@ def test_async_run(capsys):
         g = setup_graph()
         # persist assert en error because the given collection is not of type
         # dask.base.Base
-        data = g.async_run(key=('cleaned_data', 'pool1'))
-        assert data.compute() == 'cleaned_data'
+        futures = g.run(key=('cleaned_data', 'pool1'))
+        data = g.results(futures).values()[0]
+        assert data == 'cleaned_data'
 
 
 def test_async_run_all(capsys):
@@ -302,11 +315,10 @@ def test_async_run_all(capsys):
         g = setup_graph()
         # persist assert en error because the given collection is not of type
         # dask.base.Base
-        futures = g.async_run()
-        data = map(lambda x: x.compute(), futures)
-
-        assert sorted(data) == ['analyzed_cleaned_data', 'analyzed_cleaned_data',
-                                'cleaned_data', 'cleaned_data', 'data', 'data']
+        futures = g.run()
+        data = g.results(futures)
+        assert sorted(data.values()) == ['analyzed_cleaned_data', 'analyzed_cleaned_data',
+                                         'cleaned_data', 'cleaned_data', 'data', 'data']
 
         data = client.gather(futures)
         # TODO: here I do not know why gather still return delayed objects...

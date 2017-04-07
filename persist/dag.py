@@ -97,36 +97,29 @@ class DAG(Base):
         self.dask = collections_to_dsk(collections.values())
         return delayed_func
 
-    def get(self, key, **kwargs):
-        result = self._get(self.dask, key, **kwargs)
+    def get(self, key, **get_kwargs):
+        result = self._get(self.dask, key, **get_kwargs)
         if isinstance(key, list):
             # TODO: should we convert to the same type than key? This should be
             # done by dask?
-            result = list(result)
+            result = type(key)(result)
         return result
 
     def run(self, key=None):
-        if key is None:
-            # key = self._keys()#dask.keys()
-            key = self.dask.keys()
-        result = self.get(key)
-        if isinstance(key, list):
-            return dict(zip(key, result))
-        else:
-            return result
-
-    def async_run(self, key=None):
-        dsk = self.dask
-        if key is None:
-            # key = self._keys()#dsk.keys()
-            key = dsk.keys()
-        from dask.base import persist
-        if isinstance(key, list):
-            funcs = self.collections.values()
-        else:
-            funcs = self.collections[key]
-        (futures, ) = persist(funcs)
+        collections = self.collections
+        try:
+            collections = {key: collections[key]}
+        except (TypeError, KeyError):
+            if key is not None:
+                collections = {k: v for k, v in collections.items() if k in key}
+        futures = dict()
+        for key, func in collections.items():
+            futures[key] = func.persist()
         return futures
+
+    @staticmethod
+    def results(futures):
+        return {key: fut.compute() for key, fut in futures.items()}
 
     def delayed(self, func):
         @wraps(func)
