@@ -422,7 +422,7 @@ def test_async_run_all(capsys):
         # assert isinstance(data[0], str)
 
 
-def test_visualize():
+def test_visualize_not_computed():
     global IS_COMPUTED
     IS_COMPUTED = dict()
     g = setup_graph()
@@ -444,3 +444,11 @@ def test_persist_method():
         g = setup_graph()
         data = g.persist()
         assert type(data) == PersistentDAG
+
+
+def test_visualize_computed():
+    global IS_COMPUTED
+    IS_COMPUTED = dict()
+    g = setup_graph()
+    g.compute()
+    g.visualize(format='svg')

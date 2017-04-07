@@ -5,6 +5,12 @@ from .dag import DAG
 
 __all__ = ['PersistentDAG']
 
+DOT_STATUS = {
+    'computed': dict(style='filled', color='green'),
+    'not_computed': dict(style='filled', color='red'),
+    'pending': dict(style='filled', color='lightgrey'),
+}
+
 
 def get_relevant_keys_from_on_disk_cache(dsk, serializers):
     # the fact to call the method "is_computed" may slow down the code.
@@ -102,3 +108,27 @@ class PersistentDAG(DAG):
             self.cache.update(dict(zip(key, result)))
             result = list(result)
         return result
+
+    def status(self):
+        status = dict()
+        for key in self.dask.keys():
+            if key in self.serializer:
+                if self.serializer[key].is_computed(key):
+                    status[key] = 'computed'
+                else:
+                    status[key] = 'not_computed'
+        return status
+
+    def dot_status(self):
+        status = self.status()
+        dot_status = dict()
+        for key, value in status.items():
+            dot_status[key] = DOT_STATUS[value]
+        return dot_status
+
+    def visualize(self, *args, **kwargs):
+        dot_status = self.dot_status()
+        return super(PersistentDAG, self).visualize(
+            data_attributes=dot_status,
+            function_attributes=dot_status,
+            *args, **kwargs)
