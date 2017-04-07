@@ -39,6 +39,15 @@ def digraph_to_dask(graph):
     return dsk
 
 
+def eval_delayed(delayed_func, collections, *args, **kwargs):
+    # normalize args and kwargs replacing values that are in the graph by
+    # Delayed objects
+    args = [collections[arg] if arg in collections else arg for arg in args]
+    kwargs.update({k: v for k, v in collections.items() if k in kwargs})
+    delayed_func = delayed_func(*args, **kwargs)
+    return delayed_func
+
+
 class DAG(Base):
     __slots__ = ('dask', '_keys')
     _finalize = staticmethod(list)
@@ -79,14 +88,10 @@ class DAG(Base):
                 'dask_key_name') not in self.dask, "specified key is already used"
 
         delayed_func = delayed(func, pure=True)
-
-        # normalize args and kwargs replacing values that are in the graph by
-        # Delayed objects
         collections = dask_to_collections(self.dask)
-        args = [collections[arg] if arg in collections else arg for arg in args]
-        kwargs.update({k: v for k, v in collections.items() if k in kwargs})
-        delayed_func = delayed_func(*args, **kwargs)
+        delayed_func = eval_delayed(delayed_func, collections, *args, **kwargs)
         key = delayed_func._key
+
         # update state
         collections[key] = delayed_func
         self.dask = collections_to_dsk(collections.values())
