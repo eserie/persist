@@ -5,7 +5,6 @@ from dask.delayed import delayed
 
 from .dag import DAG
 from .dag import dask_to_collections
-from .dag import eval_delayed
 
 __all__ = ['PersistentDAG']
 
@@ -34,7 +33,6 @@ def get_relevant_keys_from_memory_cache(dsk, cache):
 def persistent_collections_to_dsk(collections,
                                   key=None, serializers=None, cache=None,
                                   *args, **kwargs):
-
     dsk = collections_to_dsk(collections, *args, **kwargs)
 
     if key is not None:
@@ -82,7 +80,7 @@ class PersistentDAG(DAG):
         serializer = kwargs.pop('dask_serializer', None)
         key = kwargs.get('dask_key_name')
         if key:
-            assert key not in self.dask, "specified key is already used"
+            assert key not in self._dask, "specified key is already used"
 
         # get the key before decorated with the serializer
         tmp_delayed_func = delayed(func, pure=True)(*args, **kwargs)
@@ -91,17 +89,27 @@ class PersistentDAG(DAG):
         if serializer is not None:
             func = serializer.dump_result(func, key)
             self.serializer[key] = serializer
+
         delayed_func = delayed(func, pure=True)
         collections = dask_to_collections(self._dask)
+        # normalize args and kwargs replacing values that are in the graph by
+        # Delayed objects
+        args = [collections[arg] if arg in collections else arg for arg in args]
+        kwargs.update({k: v for k, v in collections.items() if k in kwargs})
+
         if 'dask_key_name' not in kwargs:
+            # set dask_key_name in order to avoid that a new tokenize
             kwargs['dask_key_name'] = key
         else:
+            # coherence check. TODO: remove
             assert kwargs['dask_key_name'] == key
-        delayed_func = eval_delayed(delayed_func, collections, *args, **kwargs)
+
+        delayed_func = delayed_func(*args, **kwargs)
         assert key == delayed_func._key
         # update state
         collections[key] = delayed_func
         self.dask = collections_to_dsk(collections.values())
+
         return delayed_func
 
     @property

@@ -39,15 +39,6 @@ def digraph_to_dask(graph):
     return dsk
 
 
-def eval_delayed(delayed_func, collections, *args, **kwargs):
-    # normalize args and kwargs replacing values that are in the graph by
-    # Delayed objects
-    args = [collections[arg] if arg in collections else arg for arg in args]
-    kwargs.update({k: v for k, v in collections.items() if k in kwargs})
-    delayed_func = delayed_func(*args, **kwargs)
-    return delayed_func
-
-
 class DAG(Base):
     __slots__ = ('_dask', '_keys')
     _finalize = staticmethod(list)
@@ -89,18 +80,26 @@ class DAG(Base):
         """
         key = kwargs.get('dask_key_name')
         if key:
-            assert key not in self.dask, "specified key is already used"
+            assert key not in self._dask, "specified key is already used"
+
         delayed_func = delayed(func, pure=True)
         collections = dask_to_collections(self._dask)
-        delayed_func = eval_delayed(delayed_func, collections, *args, **kwargs)
+        # normalize args and kwargs replacing values that are in the graph by
+        # Delayed objects
+        args = [collections[arg] if arg in collections else arg for arg in args]
+        kwargs.update({k: v for k, v in collections.items() if k in kwargs})
+        delayed_func = delayed_func(*args, **kwargs)
+
         if key is None:
             key = delayed_func._key
         else:
+            # coherence check. TODO: remove
             assert key == delayed_func._key
 
         # update state
         collections[key] = delayed_func
         self.dask = collections_to_dsk(collections.values())
+
         return delayed_func
 
     def get(self, key, **get_kwargs):
