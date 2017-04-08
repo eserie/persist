@@ -46,12 +46,15 @@ def setup_graph(**kwargs):
     g = PersistentDAG(**kwargs)
     serializer = Serializer()
     for pool in ['pool1', 'pool2']:
-        g.add_task(load_data, dask_key_name=(
-            'data', pool), dask_serializer=serializer)
+        g.add_task(load_data,
+                   dask_key_name=('data', pool),
+                   dask_serializer=serializer)
         g.add_task(clean_data, ('data', pool),
-                   dask_key_name=('cleaned_data', pool), dask_serializer=serializer)
+                   dask_key_name=('cleaned_data', pool),
+                   dask_serializer=serializer)
         g.add_task(analyze_data, ('cleaned_data', pool),
-                   dask_key_name=('analyzed_data', pool), dask_serializer=serializer, )
+                   dask_key_name=('analyzed_data', pool),
+                   dask_serializer=serializer)
     return g
 
 
@@ -110,7 +113,7 @@ def test_key_none():
     data = g.results(futures)
     assert data.values() == ["data_{'option': 10}"]
     assert data.keys()[0].startswith('load_data-')
-    keys = g.collections.keys()
+    keys = g.dask.keys()
     assert len(keys) == 1
     assert keys[0] is not None
     assert keys[0].startswith('load_data-')
@@ -457,3 +460,30 @@ def test_visualize_computed(tmpdir):
     g = setup_graph()
     g.compute()
     g.visualize(format='svg')
+    g.visualize(format='svg', raw_dask=False)
+
+
+def test_serializer_correctly_setted_with_some_task_not_named(tmpdir):
+    tmpdir = str(tmpdir)
+    os.chdir(tmpdir)
+    global IS_COMPUTED
+    IS_COMPUTED = dict()
+
+    g = PersistentDAG()
+    serializer = Serializer()
+    for pool in ['pool1', 'pool2']:
+        g.add_task(load_data,
+                   dask_key_name=('data', pool),
+                   dask_serializer=serializer)
+        g.add_task(clean_data, ('data', pool),
+                   dask_key_name=('cleaned_data', pool),
+                   # dask_serializer=serializer
+                   )
+        g.add_task(analyze_data, ('cleaned_data', pool),
+                   # dask_key_name=('analyzed_data', pool),
+                   dask_serializer=serializer)
+
+    g.compute()
+    assert len(g.serializer) == 4
+    g.visualize(format='svg')
+    g.visualize(format='svg', raw_dask=False)

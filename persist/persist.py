@@ -1,14 +1,18 @@
 from dask.optimize import cull
 from dask.base import collections_to_dsk
+from dask.base import visualize
+from dask.delayed import delayed
 
 from .dag import DAG
+from .dag import dask_to_collections
+from .dag import eval_delayed
 
 __all__ = ['PersistentDAG']
 
 DOT_STATUS = {
-    'computed': dict(style='filled', color='lightgreen'),
-    'not_computed': dict(style='filled', color='lightred'),
-    'pending': dict(style='filled', color='lightgrey'),
+    'computed': dict(style='filled', color='green'),
+    'not_computed': dict(style='filled', color='red'),
+    'pending': dict(style='filled', color='grey'),
 }
 
 
@@ -64,7 +68,8 @@ class PersistentDAG(DAG):
         self.serializer = serializer
 
     def get_persistent_dask(self, key=None, *args, **kwargs):
-        collections = self.collections.values()
+        collections = dask_to_collections(self._dask)
+        collections = collections.values()
         return persistent_collections_to_dsk(
             collections, key, self.serializer, self.cache, *args, **kwargs)
 
@@ -75,28 +80,50 @@ class PersistentDAG(DAG):
         - dask_serializer
         """
         serializer = kwargs.pop('dask_serializer', None)
-        # do not pop because needed by DAG.add_task
-        key = kwargs.get('dask_key_name', None)
+        key = kwargs.get('dask_key_name')
+        if key:
+            assert key not in self.dask, "specified key is already used"
+
+        # get the key before decorated with the serializer
+        tmp_delayed_func = delayed(func, pure=True)(*args, **kwargs)
+        key = tmp_delayed_func._key
         # wrap func in order that it dump data as a side-effect
         if serializer is not None:
             func = serializer.dump_result(func, key)
             self.serializer[key] = serializer
-        return super(PersistentDAG, self).add_task(func, *args, **kwargs)
+        delayed_func = delayed(func, pure=True)
+        collections = dask_to_collections(self._dask)
+        if 'dask_key_name' not in kwargs:
+            kwargs['dask_key_name'] = key
+        else:
+            assert kwargs['dask_key_name'] == key
+        delayed_func = eval_delayed(delayed_func, collections, *args, **kwargs)
+        assert key == delayed_func._key
+        # update state
+        collections[key] = delayed_func
+        self.dask = collections_to_dsk(collections.values())
+        return delayed_func
 
     @property
     def persistent_dask(self):
         return self.get_persistent_dask()
 
+    @property
+    def dask(self):
+        return self.get_persistent_dask()
+
+    @dask.setter
+    def dask(self, dsk):
+        self._dask = dsk
+
     def is_computed(self):
         return {key: self.serializer[key].is_computed(key)
-                for key in self.dask.keys() if key in self.serializer}
+                for key in self._dask.keys() if key in self.serializer}
 
     def get(self, key, **kwargs):
         """
         Wrapper around dask.get.
         Use cache or serialzed data if available.
-        TODO: self.dask should be replaced by the persistent collection
-        so the method get should not have to be reproduced
         """
         dsk = self.get_persistent_dask(key)
         # get result
@@ -111,7 +138,7 @@ class PersistentDAG(DAG):
 
     def status(self):
         status = dict()
-        for key in self.dask.keys():
+        for key in self._dask.keys():
             if key in self.serializer:
                 if self.serializer[key].is_computed(key):
                     status[key] = 'computed'
@@ -126,9 +153,13 @@ class PersistentDAG(DAG):
             dot_status[key] = DOT_STATUS[value]
         return dot_status
 
-    def visualize(self, *args, **kwargs):
+    def visualize(self, raw_dask=True, *args, **kwargs):
         dot_status = self.dot_status()
-        return super(PersistentDAG, self).visualize(
-            data_attributes=dot_status,
-            # function_attributes=dot_status,
-            *args, **kwargs)
+        if raw_dask:
+            dsk = self._dask
+        else:
+            dsk = self.dask
+        return visualize(dsk,
+                         data_attributes=dot_status,
+                         # function_attributes=dot_status,
+                         *args, **kwargs)

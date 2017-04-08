@@ -49,7 +49,7 @@ def eval_delayed(delayed_func, collections, *args, **kwargs):
 
 
 class DAG(Base):
-    __slots__ = ('dask', '_keys')
+    __slots__ = ('_dask', '_keys')
     _finalize = staticmethod(list)
     _default_get = staticmethod(threaded.get)
     _optimize = staticmethod(lambda d, k, **kwds: d)
@@ -57,11 +57,15 @@ class DAG(Base):
     def __init__(self, dsk=None):
         if dsk is None:
             dsk = dict()
-        self.dask = dsk
+        self._dask = dsk
 
     @property
-    def collections(self):
-        return dask_to_collections(self.dask)
+    def dask(self):
+        return self._dask
+
+    @dask.setter
+    def dask(self, dsk):
+        self._dask = dsk
 
     @classmethod
     def from_digraph(cls, graph):
@@ -83,14 +87,16 @@ class DAG(Base):
         Special keyword arguments are:
         - dask_key_name
         """
-        if kwargs.get('dask_key_name'):
-            assert kwargs.get(
-                'dask_key_name') not in self.dask, "specified key is already used"
-
+        key = kwargs.get('dask_key_name')
+        if key:
+            assert key not in self.dask, "specified key is already used"
         delayed_func = delayed(func, pure=True)
-        collections = self.collections
+        collections = dask_to_collections(self._dask)
         delayed_func = eval_delayed(delayed_func, collections, *args, **kwargs)
-        key = delayed_func._key
+        if key is None:
+            key = delayed_func._key
+        else:
+            assert key == delayed_func._key
 
         # update state
         collections[key] = delayed_func
@@ -106,12 +112,13 @@ class DAG(Base):
         return result
 
     def run(self, key=None):
-        collections = self.collections
+        collections = dask_to_collections(self.dask)
         try:
             collections = {key: collections[key]}
         except (TypeError, KeyError):
             if key is not None:
-                collections = {k: v for k, v in collections.items() if k in key}
+                collections = {k: v for k,
+                               v in collections.items() if k in key}
         futures = dict()
         for key, func in collections.items():
             futures[key] = func.persist()

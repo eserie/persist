@@ -74,7 +74,7 @@ def test_key_none():
     data = g.results(futures)
     assert data.values() == ["data_{'option': 10}"]
     assert data.keys()[0].startswith('load_data-')
-    keys = g.collections.keys()
+    keys = g.dask.keys()
     assert len(keys) == 1
     assert keys[0] is not None
     assert keys[0].startswith('load_data-')
