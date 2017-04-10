@@ -3,10 +3,18 @@ from dask import threaded
 from dask.base import Base
 from dask.delayed import Delayed
 # from dask.optimize import cull
+from toolz import first
 from dask.base import collections_to_dsk
 from dask import delayed
 
 __all__ = ['DAG']
+
+
+def in_dict(arg, collections):
+    try:
+        return arg in collections
+    except TypeError:
+        return False
 
 
 def dask_to_collections(dask):
@@ -41,7 +49,6 @@ def digraph_to_dask(graph):
 
 class DAG(Base):
     __slots__ = ('_dask', '_keys')
-    _finalize = staticmethod(list)
     _default_get = staticmethod(threaded.get)
     _optimize = staticmethod(lambda d, k, **kwds: d)
 
@@ -69,6 +76,12 @@ class DAG(Base):
         terminal_nodes = [k for k, v in graph.succ.items() if not v]
         return terminal_nodes
 
+    def _finalize(self, args):
+        if len(self._keys()) > 1:
+            return args
+        else:
+            return first(args)
+
     def _keys(self):
         return self.terminal_nodes
         # return self.dask.keys()
@@ -86,8 +99,11 @@ class DAG(Base):
         collections = dask_to_collections(self._dask)
         # normalize args and kwargs replacing values that are in the graph by
         # Delayed objects
-        args = [collections[arg] if arg in collections else arg for arg in args]
+
+        args = [collections[arg] if in_dict(
+            arg, collections) else arg for arg in args]
         kwargs.update({k: v for k, v in collections.items() if k in kwargs})
+
         delayed_func = delayed_func(*args, **kwargs)
 
         if key is None:

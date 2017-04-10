@@ -127,7 +127,7 @@ def test_add_task_in_good_order():
     g.add_task(analyze_data, ('cleaned_data', 'pool1'),
                dask_key_name=('analyzed_data', 'pool1'))
     data = g.compute()
-    assert data == ['analyzed_cleaned_data']
+    assert data == 'analyzed_cleaned_data'
 
 
 def test_add_task_in_wrong_order():
@@ -336,7 +336,7 @@ def test_visualize(tmpdir):
 def test_compute_method():
     g = setup_graph()
     data = g.compute()
-    assert data == ['analyzed_cleaned_data', 'analyzed_cleaned_data']
+    assert data == ('analyzed_cleaned_data', 'analyzed_cleaned_data')
 
 
 def test_persist_method():
@@ -361,4 +361,16 @@ def test_dask_to_digraph():
     assert dsk == g.dask
     g2 = DAG.from_digraph(graph)
     data = g2.compute()
-    assert data == ['analyzed_cleaned_data', 'analyzed_cleaned_data']
+    assert data == ('analyzed_cleaned_data', 'analyzed_cleaned_data')
+
+
+def test_df():
+    import pandas as pd
+    data = pd.DataFrame({'A': [1, 2], 'B': [3, 4]})
+    g = DAG()
+
+    def f(x): return x
+    g.add_task(f, data)
+    result = g.compute()
+    assert isinstance(result, pd.DataFrame)
+    assert result.equals(data)

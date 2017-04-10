@@ -440,7 +440,7 @@ def test_compute_method():
     IS_COMPUTED = dict()
     g = setup_graph()
     data = g.compute()
-    assert data == ['analyzed_cleaned_data', 'analyzed_cleaned_data']
+    assert data == ('analyzed_cleaned_data', 'analyzed_cleaned_data')
 
 
 def test_persist_method():
@@ -485,5 +485,17 @@ def test_serializer_correctly_setted_with_some_task_not_named(tmpdir):
 
     g.compute()
     assert len(g.serializer) == 4
-    g.visualize(format='svg')
+    g.visualize(fogrmat='svg')
     g.visualize(format='svg', raw_dask=False)
+
+
+def test_df():
+    import pandas as pd
+    data = pd.DataFrame({'A': [1, 2], 'B': [3, 4]})
+    g = PersistentDAG()
+
+    def f(x): return x
+    g.add_task(f, data)
+    result = g.compute()
+    assert isinstance(result, pd.DataFrame)
+    assert result.equals(data)

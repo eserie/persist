@@ -5,6 +5,7 @@ from dask.delayed import delayed
 
 from .dag import DAG
 from .dag import dask_to_collections
+from .dag import in_dict
 
 __all__ = ['PersistentDAG']
 
@@ -94,7 +95,8 @@ class PersistentDAG(DAG):
         collections = dask_to_collections(self._dask)
         # normalize args and kwargs replacing values that are in the graph by
         # Delayed objects
-        args = [collections[arg] if arg in collections else arg for arg in args]
+        args = [collections[arg] if in_dict(
+            arg, collections) else arg for arg in args]
         kwargs.update({k: v for k, v in collections.items() if k in kwargs})
 
         if 'dask_key_name' not in kwargs:
