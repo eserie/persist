@@ -60,13 +60,13 @@ def persistent_collections_to_dsk(collections,
     return dsk
 
 
-def persistent_from_delayed(delayed, serializer, cache, *args, **kwargs):
+def persistent_from_delayed(delayed, serializers=None, cache=None, *args, **kwargs):
     key = delayed._key
     dsk = delayed.dask
     collections = dask_to_collections(dsk)
     collections = collections.values()
     persistent_dsk = persistent_collections_to_dsk(
-        collections, key, serializer, cache, *args, **kwargs)
+        collections, key, serializers, cache, *args, **kwargs)
     return Delayed(key, persistent_dsk)
 
 
@@ -98,20 +98,20 @@ def decorate_delayed(delayed_func, dump, decorate_mode=None):
 
 
 class PersistentDAG(DAG):
-    def __init__(self, dsk=None, cache=None, serializer=None):
+    def __init__(self, dsk=None, cache=None, serializers=None):
         super(PersistentDAG, self).__init__(dsk)
         if cache is None:
             cache = dict()
-        if serializer is None:
-            serializer = dict()
+        if serializers is None:
+            serializers = dict()
         self.cache = cache
-        self.serializer = serializer
+        self.serializers = serializers
 
     def get_persistent_dask(self, key=None, *args, **kwargs):
         collections = dask_to_collections(self._dask)
         collections = collections.values()
         return persistent_collections_to_dsk(
-            collections, key, self.serializer, self.cache, *args, **kwargs)
+            collections, key, self.serializers, self.cache, *args, **kwargs)
 
     def add_task(self, func, *args, **kwargs):
         """
@@ -127,7 +127,7 @@ class PersistentDAG(DAG):
             delayed_dump = decorate_delayed(
                 delayed_func, serializer.dump, decorate_mode=None)
             self._dask.update(delayed_dump.dask)
-            self.serializer[key] = serializer
+            self.serializers[key] = serializer
             return Delayed(key, self._dask)
         else:
             return delayed_func
@@ -145,8 +145,8 @@ class PersistentDAG(DAG):
         self._dask = dsk
 
     def is_computed(self):
-        return {key: self.serializer[key].is_computed(key)
-                for key in self._dask.keys() if key in self.serializer}
+        return {key: self.serializers[key].is_computed(key)
+                for key in self._dask.keys() if key in self.serializers}
 
     def get(self, key, **kwargs):
         """
@@ -167,8 +167,8 @@ class PersistentDAG(DAG):
     def status(self):
         status = dict()
         for key in self._dask.keys():
-            if key in self.serializer:
-                if self.serializer[key].is_computed(key):
+            if key in self.serializers:
+                if self.serializers[key].is_computed(key):
                     status[key] = 'computed'
                 else:
                     status[key] = 'not_computed'

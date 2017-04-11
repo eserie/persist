@@ -248,7 +248,7 @@ def test_persistent_from_delayed():
     assert len(cleaned_data.dask) == 2
     assert cleaned_data.compute() == 'cleaned_data'
     from ..persist import persistent_from_delayed
-    obj = persistent_from_delayed(cleaned_data, g.serializer, g.cache)
+    obj = persistent_from_delayed(cleaned_data, g.serializers, g.cache)
     assert len(obj.dask) == 1
     assert obj.compute() == 'cleaned_data'
 
@@ -491,7 +491,7 @@ def test_serializer_correctly_setted_with_some_task_not_named(tmpdir):
                    dask_serializer=serializer)
 
     g.compute()
-    assert len(g.serializer) == 4
+    assert len(g.serializers) == 4
     g.visualize(fogrmat='svg')
     g.visualize(format='svg', raw_dask=False)
 
