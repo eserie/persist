@@ -28,20 +28,6 @@ class Serializer(object):
     def is_computed(self, key):
         return IS_COMPUTED.get(key) is not None
 
-    def delayed_load(self, key):
-        def load():
-            return self.load(key)
-        return load
-
-    def dump_result(self, func, key):
-        @wraps(func)
-        def wrapped_func(*args, **kwargs):
-            result = func(*args, **kwargs)
-            self.dump(key, result)
-            return result
-        return wrapped_func
-
-
 def setup_graph(**kwargs):
     g = PersistentDAG(**kwargs)
     serializer = Serializer()
@@ -115,9 +101,8 @@ def test_key_none():
     assert data.keys()[0].startswith('load_data-')
     keys = g.dask.keys()
     assert len(keys) == 1
-    assert keys[0] is not None
     assert keys[0].startswith('load_data-')
-
+        
 
 def test_key_none_serializer_none():
     global IS_COMPUTED
