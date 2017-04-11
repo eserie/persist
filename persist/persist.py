@@ -35,7 +35,8 @@ def persistent_collections_to_dsk(collections,
                                   key=None, serializers=None, cache=None,
                                   *args, **kwargs):
     """
-
+    wrapper arount dask.base.collections_to_dsk
+    *args and **kwargs are passed to collections_to_dsk
     """
 
     dsk = collections_to_dsk(collections, *args, **kwargs)
@@ -60,7 +61,10 @@ def persistent_collections_to_dsk(collections,
     return dsk
 
 
-def persistent_from_delayed(delayed, serializers=None, cache=None, *args, **kwargs):
+def delayed_using_cache(delayed, serializers=None, cache=None, *args, **kwargs):
+    """
+    *args and **kwargs are passed to collections_to_dsk
+    """
     key = delayed._key
     dsk = delayed.dask
     collections = dask_to_collections(dsk)

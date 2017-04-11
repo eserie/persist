@@ -232,7 +232,7 @@ def test_persistent_delayed():
     assert cleaned_data.compute() == 'cleaned_data'
 
 
-def test_persistent_from_delayed():
+def test_delayed_using_cache():
     """
     Check with have the same behaviour than with dask delayed.
     """
@@ -247,8 +247,8 @@ def test_persistent_from_delayed():
         dask_serializer=serializer)
     assert len(cleaned_data.dask) == 2
     assert cleaned_data.compute() == 'cleaned_data'
-    from ..persist import persistent_from_delayed
-    obj = persistent_from_delayed(cleaned_data, g.serializers, g.cache)
+    from ..persist import delayed_using_cache
+    obj = delayed_using_cache(cleaned_data, g.serializers, g.cache)
     assert len(obj.dask) == 1
     assert obj.compute() == 'cleaned_data'
 
