@@ -17,11 +17,11 @@ class Serializer(object):
         pass
 
     def load(self, key):
-        print "load data for key {} ...".format(key)
+        print "serialzer load data for key {} ...".format(key)
         return IS_COMPUTED[key]
 
     def dump(self, key, value):
-        print "save data with key {} ...".format(key)
+        print "serialzer dump data for key {} ...".format(key)
         IS_COMPUTED[key] = value
 
     def is_computed(self, key):
@@ -272,18 +272,18 @@ def test_get_multiple_times(capsys):
     # check printed messages
     out, err = capsys.readouterr()
     assert out == """load data ...
-save data with key ('data', 'pool1') ...
+serialzer dump data for key ('data', 'pool1') ...
 clean data ...
-save data with key ('cleaned_data', 'pool1') ...
+serialzer dump data for key ('cleaned_data', 'pool1') ...
 analyze data ...
-save data with key ('analyzed_data', 'pool1') ...
-load data for key ('cleaned_data', 'pool1') ...
+serialzer dump data for key ('analyzed_data', 'pool1') ...
+serialzer load data for key ('cleaned_data', 'pool1') ...
 load data ...
-save data with key ('data', 'pool2') ...
+serialzer dump data for key ('data', 'pool2') ...
 clean data ...
-save data with key ('cleaned_data', 'pool2') ...
+serialzer dump data for key ('cleaned_data', 'pool2') ...
 analyze data ...
-save data with key ('analyzed_data', 'pool2') ...
+serialzer dump data for key ('analyzed_data', 'pool2') ...
 """
     assert not err
 
@@ -351,20 +351,21 @@ def test_persistent_dask(capsys):
          'load data ...',
          'load data ...',
          'load data ...',
-         "load data for key ('analyzed_data', 'pool1') ...",
-         "load data for key ('analyzed_data', 'pool2') ...",
-         "save data with key ('analyzed_data', 'pool1') ...",
-         "save data with key ('analyzed_data', 'pool2') ...",
-         "save data with key ('cleaned_data', 'pool1') ...",
-         "save data with key ('cleaned_data', 'pool1') ...",
-         "save data with key ('cleaned_data', 'pool2') ...",
-         "save data with key ('cleaned_data', 'pool2') ...",
-         "save data with key ('data', 'pool1') ...",
-         "save data with key ('data', 'pool1') ...",
-         "save data with key ('data', 'pool1') ...",
-         "save data with key ('data', 'pool2') ...",
-         "save data with key ('data', 'pool2') ...",
-         "save data with key ('data', 'pool2') ..."]
+         "serialzer dump data for key ('analyzed_data', 'pool1') ...",
+         "serialzer dump data for key ('analyzed_data', 'pool2') ...",
+         "serialzer dump data for key ('cleaned_data', 'pool1') ...",
+         "serialzer dump data for key ('cleaned_data', 'pool1') ...",
+         "serialzer dump data for key ('cleaned_data', 'pool2') ...",
+         "serialzer dump data for key ('cleaned_data', 'pool2') ...",
+         "serialzer dump data for key ('data', 'pool1') ...",
+         "serialzer dump data for key ('data', 'pool1') ...",
+         "serialzer dump data for key ('data', 'pool1') ...",
+         "serialzer dump data for key ('data', 'pool2') ...",
+         "serialzer dump data for key ('data', 'pool2') ...",
+         "serialzer dump data for key ('data', 'pool2') ...",
+         "serialzer load data for key ('analyzed_data', 'pool1') ...",
+         "serialzer load data for key ('analyzed_data', 'pool2') ...",
+        ]
     assert not err
 
 
