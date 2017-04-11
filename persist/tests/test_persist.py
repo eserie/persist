@@ -1,6 +1,5 @@
 import os
 import pytest
-from functools import wraps
 import dask
 from distributed import Client
 from ..persist import PersistentDAG
@@ -27,6 +26,7 @@ class Serializer(object):
 
     def is_computed(self, key):
         return IS_COMPUTED.get(key) is not None
+
 
 def setup_graph(**kwargs):
     g = PersistentDAG(**kwargs)
@@ -102,7 +102,7 @@ def test_key_none():
     keys = g.dask.keys()
     assert len(keys) == 1
     assert keys[0].startswith('load_data-')
-        
+
 
 def test_key_none_serializer_none():
     global IS_COMPUTED

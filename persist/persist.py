@@ -1,16 +1,10 @@
-# from functools import partial
 from functools import wraps
-from pprint import pprint
 from dask.optimize import cull
 from dask.base import collections_to_dsk
 from dask.base import visualize
-from dask.delayed import delayed
 from dask.delayed import Delayed
-from toolz import curry
-from toolz import first
 from .dag import DAG
 from .dag import dask_to_collections
-from .dag import in_dict
 
 __all__ = ['PersistentDAG']
 
@@ -53,14 +47,6 @@ def persistent_collections_to_dsk(collections,
         # load instead of compute
         dsk_serialized = get_relevant_keys_from_on_disk_cache(dsk, serializers)
         dsk.update(dsk_serialized)
-        # for k in dsk_serialized.keys():
-        #     dump_key = ('serialize', k)
-        #     if dump_key in dsk:
-        #         del dsk[dump_key]
-        #     compute_key = ('compute', k)
-        #     if compute_key in dsk:
-        #         # it may depends of the mode used to dump data.
-        #         del dsk[compute_key]
 
     if cache is not None:
         # use cache instead of loadind
@@ -99,25 +85,6 @@ def decorate_delayed(delayed_func, dump, decorate_mode=None):
         task[0] = dump_result(dump,  task[0], key)
         dsk[key] = tuple(task)
         return Delayed(key, dsk)
-    # elif decorate_mode == 'add_dump_tasks':
-    #     dump_key = ('serialize', key)
-    #     # we must use partial in order to avoid confusion with the key of the graph
-    #     delayed_dump = delayed(partial(dump, key=key), pure=True)
-    #     # simply add tasks which dump data.
-    #     # this way to do is problematic because it becomes complicated to retriew tasks that generate data in the graph
-    #     delayed_dump = delayed_dump(value=delayed_func, dask_key_name=dump_key)
-    #     return delayed_dump
-    # elif decorate_mode == 'dask_decorate_with_dump':
-    #     # decorate the original function via explicit dask tasks
-    #     dump_key = ('serialize', key)
-    #     compute_key = ('compute', key)
-    #     # we must use partial in order to avoid confusion with the key of the graph
-    #     delayed_dump = delayed(partial(dump, key=key), pure=True)
-    #     dsk[compute_key] = dsk.pop(key)
-    #     delayed_compute = Delayed(compute_key, dsk)
-    #     delayed_dump = delayed_dump(value=delayed_compute, dask_key_name=dump_key)
-    #     delayed_decorated = delayed(first, pure=True)([delayed_compute, delayed_dump], dask_key_name=key)
-    #     return delayed_decorated
 
 
 class PersistentDAG(DAG):
@@ -214,9 +181,3 @@ class PersistentDAG(DAG):
                          data_attributes=dot_status,
                          # function_attributes=dot_status,
                          *args, **kwargs)
-
-    # @staticmethod
-    # def results(futures):
-    #     results = {key: fut.compute() for key, fut in futures.items()}
-    #     results = {k:v for k, v in results.items() if not (isinstance(k, tuple) and k[0] in ['serialize', 'compute'])}
-    #     return results
