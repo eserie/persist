@@ -60,6 +60,16 @@ def persistent_collections_to_dsk(collections,
     return dsk
 
 
+def persistent_from_delayed(delayed, serializer, cache, *args, **kwargs):
+    key = delayed._key
+    dsk = delayed.dask
+    collections = dask_to_collections(dsk)
+    collections = collections.values()
+    persistent_dsk = persistent_collections_to_dsk(
+        collections, key, serializer, cache, *args, **kwargs)
+    return Delayed(key, persistent_dsk)
+
+
 def dump_result(dump, func, key):
     @wraps(func)
     def wrapped_func(*args, **kwargs):

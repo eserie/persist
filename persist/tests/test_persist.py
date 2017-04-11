@@ -232,6 +232,27 @@ def test_persistent_delayed():
     assert cleaned_data.compute() == 'cleaned_data'
 
 
+def test_persistent_from_delayed():
+    """
+    Check with have the same behaviour than with dask delayed.
+    """
+    global IS_COMPUTED
+    IS_COMPUTED = dict()
+    g = PersistentDAG()
+    serializer = Serializer()
+    data = g.delayed(load_data)(dask_key_name=('data', 'pool1'))
+    cleaned_data = g.delayed(clean_data)(
+        dask_key_name=('cleaned_data', 'pool1'),
+        data=data,
+        dask_serializer=serializer)
+    assert len(cleaned_data.dask) == 2
+    assert cleaned_data.compute() == 'cleaned_data'
+    from ..persist import persistent_from_delayed
+    obj = persistent_from_delayed(cleaned_data, g.serializer, g.cache)
+    assert len(obj.dask) == 1
+    assert obj.compute() == 'cleaned_data'
+
+
 def test_get(capsys):
     global IS_COMPUTED
     IS_COMPUTED = dict()
@@ -365,7 +386,7 @@ def test_persistent_dask(capsys):
          "serialzer dump data for key ('data', 'pool2') ...",
          "serialzer load data for key ('analyzed_data', 'pool1') ...",
          "serialzer load data for key ('analyzed_data', 'pool2') ...",
-        ]
+         ]
     assert not err
 
 
