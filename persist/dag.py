@@ -125,14 +125,13 @@ class DAG(Base):
         return result
 
     def compute(self, **kwargs):
-        #result = Base.compute(self, **kwargs)
         keys = self._keys()
         if len(keys) == 1:
             keys = keys[0]
         result = self.get(keys, **kwargs)
-        
+
         return result
-        
+
     def run(self, keys=None):
         collections = dask_to_collections(self.dask)
         try:
