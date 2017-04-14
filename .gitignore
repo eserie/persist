@@ -24,6 +24,6 @@ htmlcov/*
 *~
 
 notebooks/*
-
+.coverage*
 
 .DS_Store
