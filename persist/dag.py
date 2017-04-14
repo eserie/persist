@@ -118,22 +118,29 @@ class DAG(Base):
 
         return delayed_func
 
-    def get(self, key, **get_kwargs):
-        result = self._get(self.dask, key, **get_kwargs)
-        if isinstance(key, list):
-            # TODO: should we convert to the same type than key? This should be
-            # done by dask?
-            result = type(key)(result)
+    def get(self, keys=None, **kwargs):
+        if keys is None:
+            keys = self._keys()
+        result = self._get(self.dask, keys, **kwargs)
         return result
 
-    def run(self, key=None):
+    def compute(self, **kwargs):
+        #result = Base.compute(self, **kwargs)
+        keys = self._keys()
+        if len(keys) == 1:
+            keys = keys[0]
+        result = self.get(keys, **kwargs)
+        
+        return result
+        
+    def run(self, keys=None):
         collections = dask_to_collections(self.dask)
         try:
-            collections = {key: collections[key]}
+            collections = {keys: collections[keys]}
         except (TypeError, KeyError):
-            if key is not None:
+            if keys is not None:
                 collections = {k: v for k,
-                               v in collections.items() if k in key}
+                               v in collections.items() if k in keys}
         futures = dict()
         for key, func in collections.items():
             futures[key] = func.persist()

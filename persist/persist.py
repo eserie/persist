@@ -152,20 +152,21 @@ class PersistentDAG(DAG):
         return {key: self.serializers[key].is_computed(key)
                 for key in self._dask.keys() if key in self.serializers}
 
-    def get(self, key, **kwargs):
+    def get(self, keys=None, **kwargs):
         """
         Wrapper around dask.get.
         Use cache or serialzed data if available.
         """
-        dsk = self.get_persistent_dask(key)
+        if keys is None:
+            keys = self._keys()
+        dsk = self.get_persistent_dask(keys)
         # get result
-        result = self._get(dsk, key, **kwargs)
+        result = self._get(dsk, keys, **kwargs)
         # store in cache
         try:
-            self.cache.update({key: result})
+            self.cache.update({keys: result})
         except TypeError:
-            self.cache.update(dict(zip(key, result)))
-            result = list(result)
+            self.cache.update(dict(zip(keys, result)))
         return result
 
     def status(self):

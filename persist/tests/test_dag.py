@@ -249,7 +249,7 @@ def test_get_multiple_times(capsys):
 
     # get multiple results
     data = g.get([('analyzed_data', 'pool1'), ('analyzed_data', 'pool2')])
-    assert isinstance(data, list)
+    assert isinstance(data, tuple)
 
     # check printed messages
     out, err = capsys.readouterr()
@@ -279,7 +279,7 @@ analyze data ...
 def test_run(capsys):
     g = setup_graph()
     # run the graph
-    futures = g.run(key=('cleaned_data', 'pool2'))
+    futures = g.run(keys=('cleaned_data', 'pool2'))
     data = g.results(futures).values()[0]
     assert data == 'cleaned_data'
 
@@ -306,7 +306,7 @@ def test_async_run(capsys):
         g = setup_graph()
         # persist assert en error because the given collection is not of type
         # dask.base.Base
-        futures = g.run(key=('cleaned_data', 'pool1'))
+        futures = g.run(keys=('cleaned_data', 'pool1'))
         data = g.results(futures).values()[0]
         assert data == 'cleaned_data'
 
@@ -336,6 +336,12 @@ def test_visualize(tmpdir):
 def test_compute_method():
     g = setup_graph()
     data = g.compute()
+    assert data == ('analyzed_cleaned_data', 'analyzed_cleaned_data')
+
+
+def test_get_with_no_argument():
+    g = setup_graph()
+    data = g.get()
     assert data == ('analyzed_cleaned_data', 'analyzed_cleaned_data')
 
 
